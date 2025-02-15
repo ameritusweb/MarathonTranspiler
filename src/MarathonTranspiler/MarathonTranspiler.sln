@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35806.99 d17.13
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarathonTranspiler", "MarathonTranspiler.csproj", "{CA038240-C354-4BBC-80C0-A509556B6266}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CA038240-C354-4BBC-80C0-A509556B6266}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA038240-C354-4BBC-80C0-A509556B6266}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA038240-C354-4BBC-80C0-A509556B6266}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA038240-C354-4BBC-80C0-A509556B6266}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F858A57B-B82A-4C19-8F18-567B1C67BB3C}
+	EndGlobalSection
+EndGlobal

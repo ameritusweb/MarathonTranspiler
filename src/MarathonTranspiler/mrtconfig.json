@@ -1,0 +1,8 @@
+{
+  "transpilerOptions": {
+    "target": "net8.0"
+  },
+  "rootDir": "E:/",
+  "include": [ "marathon/**/*.mrt" ],
+  "exclude": []
+}
