@@ -535,5 +535,75 @@ namespace MarathonTranspiler.Test
             StringAssert.Contains("_grainFactory = grainFactory;", output);
             StringAssert.Contains("_logger.LogInformation(\"Processing order...\");", output);
         }
+
+        [Test]
+        public void OrleansGrain_WithStateIds_ShouldGenerateIdAttributes()
+        {
+            // Arrange
+            _transpiler = new OrleansTranspiler(new OrleansConfig
+            {
+                Stateful = true,
+                GrainKeyTypes = new Dictionary<string, string>
+       {
+           { "OrderGrain", "string" }
+       }
+            });
+
+            var idProperty = new AnnotatedCode
+            {
+                Annotations = new List<Annotation>
+       {
+           new Annotation
+           {
+               Name = "varInit",
+               Values = new List<KeyValuePair<string, string>>
+               {
+                   new("className", "OrderGrain"),
+                   new("type", "string"),
+                   new("stateName", "Id"),
+                   new("stateId", "0")
+               }
+           }
+       },
+                Code = new List<string> { "this.OrderId = \"\";" }
+            };
+
+            var createdAtProperty = new AnnotatedCode
+            {
+                Annotations = new List<Annotation>
+       {
+           new Annotation
+           {
+               Name = "varInit",
+               Values = new List<KeyValuePair<string, string>>
+               {
+                   new("className", "OrderGrain"),
+                   new("type", "DateTime"),
+                   new("stateName", "CreatedAt"),
+                   new("stateId", "1")
+               }
+           }
+       },
+                Code = new List<string> { "this.CreatedAt = DateTime.UtcNow;" }
+            };
+
+            _annotatedCode.Add(idProperty);
+            _annotatedCode.Add(createdAtProperty);
+
+            // Act
+            _transpiler.ProcessAnnotatedCode(_annotatedCode);
+            var output = _transpiler.GenerateOutput();
+
+            // Assert
+            StringAssert.Contains("public class OrderGrainState", output);
+            StringAssert.Contains("[Id(0)]", output);
+            StringAssert.Contains("public string Id { get; set; }", output);
+            StringAssert.Contains("[Id(1)]", output);
+            StringAssert.Contains("public DateTime CreatedAt { get; set; }", output);
+            StringAssert.Contains("public string OrderId", output);
+            StringAssert.Contains("get => State.Id;", output);
+            StringAssert.Contains("public DateTime CreatedAt", output);
+            StringAssert.Contains("get => State.CreatedAt;", output);
+        }
     }
 }
