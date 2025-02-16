@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MarathonTranspiler.Transpilers.CSharp.Generators
+namespace MarathonTranspiler.Transpilers.Wpf
 {
-    class XUnitGenerator
+    public class WpfConfig
     {
     }
 }

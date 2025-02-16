@@ -3,6 +3,7 @@ using MarathonTranspiler.Transpilers.Orleans;
 using MarathonTranspiler.Transpilers.Python;
 using MarathonTranspiler.Transpilers.React;
 using MarathonTranspiler.Transpilers.Unity;
+using MarathonTranspiler.Transpilers.Wpf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,6 +23,7 @@ namespace MarathonTranspiler.Core
                 "unity" => new UnityTranspiler(options.Unity),
                 "react" => new ReactTranspiler(options.React),
                 "python" => new PythonTranspiler(options.Python),
+                "wpf" => new WpfTranspiler(options.Wpf),
                 _ => throw new ArgumentException($"Unsupported target: {options.Target}")
             };
         }

@@ -16,5 +16,6 @@ namespace MarathonTranspiler.Core
         public List<string> Assertions { get; set; } = new();
         public bool IsAbstract { get; set; }
         public string BaseClass { get; set; }
+        public Dictionary<string, List<string>> AdditionalData { get; set; } = new();
     }
 }

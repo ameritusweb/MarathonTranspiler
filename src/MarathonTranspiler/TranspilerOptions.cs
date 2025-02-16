@@ -3,6 +3,7 @@ using MarathonTranspiler.Transpilers.Orleans;
 using MarathonTranspiler.Transpilers.Python;
 using MarathonTranspiler.Transpilers.React;
 using MarathonTranspiler.Transpilers.Unity;
+using MarathonTranspiler.Transpilers.Wpf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,5 +32,8 @@ namespace MarathonTranspiler
 
         [JsonPropertyName("react")]
         public ReactConfig React { get; set; }
+        
+        [JsonPropertyName("epf")]
+        public WpfConfig Wpf { get; set; }
     }
 }

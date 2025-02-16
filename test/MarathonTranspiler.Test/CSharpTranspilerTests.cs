@@ -13,7 +13,7 @@ namespace MarathonTranspiler.Test
         public void Setup()
         {
             _transpiler = new CSharpTranspiler(new CSharpConfig() { 
-                TestFramework = ".net8.0"
+                TestFramework = "nunit"
             });
             _annotatedCode = new List<AnnotatedCode>();
         }
@@ -47,6 +47,11 @@ namespace MarathonTranspiler.Test
             // Assert
             StringAssert.Contains("public class Calculator", output);
             StringAssert.Contains("public float Value { get; set; }", output);
+            StringAssert.Contains("public Calculator()", output);
+            StringAssert.Contains("this.Value = 0f;", output);
+            StringAssert.Contains("public class Program", output);
+            StringAssert.Contains("public static void Main(string[] args)", output);
+            StringAssert.Contains("Calculator calculator = new Calculator();", output);
         }
     }
 }
