@@ -37,10 +37,31 @@ namespace MarathonTranspiler.Transpilers.Orleans
             }
             else
             {
-                var type = block.Annotations[0].Values.First(v => v.Key == "type").Value;
+                var annotation = block.Annotations[0];
+                var type = annotation.Values.First(v => v.Key == "type").Value;
                 var propertyName = block.Code[0].Split('=')[0].Replace("this.", "").Trim();
-                currentClass.Properties.Add(new TranspiledProperty { Name = propertyName, Type = type });
-                currentClass.ConstructorLines.Add(block.Code[0]);
+
+                // Check if this should be a state property
+                if (annotation.Values.Any(v => v.Key == "stateName"))
+                {
+                    var stateName = annotation.Values.First(v => v.Key == "stateName").Value;
+                    currentClass.Properties.Add(new TranspiledProperty
+                    {
+                        Name = propertyName,
+                        Type = type,
+                        StateName = stateName  // New property in TranspiledProperty
+                    });
+                    // Don't add to constructor lines as we'll handle in property
+                }
+                else
+                {
+                    currentClass.Properties.Add(new TranspiledProperty
+                    {
+                        Name = propertyName,
+                        Type = type
+                    });
+                    currentClass.ConstructorLines.Add(block.Code[0]);
+                }
             }
         }
 
@@ -132,12 +153,25 @@ namespace MarathonTranspiler.Transpilers.Orleans
                 // Properties
                 foreach (var prop in classInfo.Properties)
                 {
-                    var propAttribute = _config.Stateful ? "[JsonProperty]" : "";
-                    if (!string.IsNullOrEmpty(propAttribute))
+                    if (!string.IsNullOrEmpty(prop.StateName))
                     {
-                        sb.AppendLine($"\t{propAttribute}");
+                        // Generate property that accesses state
+                        sb.AppendLine($"\tpublic {prop.Type} {prop.Name}");
+                        sb.AppendLine("\t{");
+                        sb.AppendLine($"\t\tget => State.{prop.StateName};");
+                        sb.AppendLine($"\t\tset => State.{prop.StateName} = value;");
+                        sb.AppendLine("\t}");
                     }
-                    sb.AppendLine($"\tpublic {prop.Type} {prop.Name} {{ get; set; }}");
+                    else
+                    {
+                        // Regular property
+                        var propAttribute = _config.Stateful ? "[JsonProperty]" : "";
+                        if (!string.IsNullOrEmpty(propAttribute))
+                        {
+                            sb.AppendLine($"\t{propAttribute}");
+                        }
+                        sb.AppendLine($"\tpublic {prop.Type} {prop.Name} {{ get; set; }}");
+                    }
                 }
                 if (classInfo.Properties.Any()) sb.AppendLine();
 
@@ -183,10 +217,10 @@ namespace MarathonTranspiler.Transpilers.Orleans
                 if (_config.Stateful)
                 {
                     sb.AppendLine($"public class {classInfo.ClassName}State {{");
-                    foreach (var prop in classInfo.Properties)
+                    foreach (var prop in classInfo.Properties.Where(p => !string.IsNullOrEmpty(p.StateName)))
                     {
                         sb.AppendLine($"\t[JsonProperty]");
-                        sb.AppendLine($"\tpublic {prop.Type} {prop.Name} {{ get; set; }}");
+                        sb.AppendLine($"\tpublic {prop.Type} {prop.StateName} {{ get; set; }}");
                     }
                     sb.AppendLine("}");
                 }

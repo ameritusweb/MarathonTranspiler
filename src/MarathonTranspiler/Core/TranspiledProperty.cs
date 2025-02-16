@@ -10,5 +10,6 @@ namespace MarathonTranspiler.Core
     {
         public string Name { get; set; }
         public string Type { get; set; }
+        public string StateName { get; set; }
     }
 }
