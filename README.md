@@ -1,3 +1,16 @@
+# Marathon Transpiler
+Marathon is a Runtime-First code transpiler that lets you write code in execution order, then automatically generates the necessary class structures and boilerplate. It's particularly useful for event-driven, distributed, and parallel systems where execution flow is important to understand.
+
+## Why Runtime-First?
+Traditional programming starts with static structures (classes, methods) before defining execution flow. This can make it harder to understand how code actually runs, especially in:
+
+- Distributed systems (like Microsoft Orleans)
+- UI frameworks (React, WPF)
+- Game engines (Unity)
+- Scientific computing (Python with NumPy/SymPy)
+
+Marathon lets you write code in the order it executes, then handles the structure for you.
+
 # **Runtime-First Software Development: A Paradigm Shift in Code Design and Test-Driven Development**
 
 ## **Introduction**
