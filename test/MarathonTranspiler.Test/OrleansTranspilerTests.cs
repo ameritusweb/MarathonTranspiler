@@ -450,5 +450,90 @@ namespace MarathonTranspiler.Test
             StringAssert.Contains("[Fact]", output);
             StringAssert.Contains("Assert.True(this.Count == 0, \"Counter should start at zero\");", output);
         }
+
+        [Test]
+        public void OrleansGrain_WithInjectedDependencies_ShouldGenerateConstructorAndFields()
+        {
+            // Arrange
+            _transpiler = new OrleansTranspiler(new OrleansConfig
+            {
+                Stateful = true,
+                GrainKeyTypes = new Dictionary<string, string>
+       {
+           { "OrderGrain", "string" }
+       }
+            });
+
+            var injectLoggerCode = new AnnotatedCode
+            {
+                Annotations = new List<Annotation>
+       {
+           new Annotation
+           {
+               Name = "inject",
+               Values = new List<KeyValuePair<string, string>>
+               {
+                   new("className", "OrderGrain"),
+                   new("type", "ILogger<OrderGrain>"),
+                   new("name", "_logger")
+               }
+           }
+       },
+                Code = new List<string> { }
+            };
+
+            var injectFactoryCode = new AnnotatedCode
+            {
+                Annotations = new List<Annotation>
+       {
+           new Annotation
+           {
+               Name = "inject",
+               Values = new List<KeyValuePair<string, string>>
+               {
+                   new("className", "OrderGrain"),
+                   new("type", "IGrainFactory"),
+                   new("name", "_grainFactory")
+               }
+           }
+       },
+                Code = new List<string> { }
+            };
+
+            var methodCode = new AnnotatedCode
+            {
+                Annotations = new List<Annotation>
+       {
+           new Annotation
+           {
+               Name = "run",
+               Values = new List<KeyValuePair<string, string>>
+               {
+                   new("className", "OrderGrain"),
+                   new("functionName", "ProcessOrder")
+               }
+           }
+       },
+                Code = new List<string> { "_logger.LogInformation(\"Processing order...\");" }
+            };
+
+            _annotatedCode.Add(injectLoggerCode);
+            _annotatedCode.Add(injectFactoryCode);
+            _annotatedCode.Add(methodCode);
+
+            // Act
+            _transpiler.ProcessAnnotatedCode(_annotatedCode);
+            var output = _transpiler.GenerateOutput();
+
+            // Assert
+            StringAssert.Contains("private readonly ILogger<OrderGrain> _logger;", output);
+            StringAssert.Contains("private readonly IGrainFactory _grainFactory;", output);
+            StringAssert.Contains("public OrderGrain(", output);
+            StringAssert.Contains("ILogger<OrderGrain> logger,", output);
+            StringAssert.Contains("IGrainFactory grainFactory,", output);
+            StringAssert.Contains("_logger = logger;", output);
+            StringAssert.Contains("_grainFactory = grainFactory;", output);
+            StringAssert.Contains("_logger.LogInformation(\"Processing order...\");", output);
+        }
     }
 }

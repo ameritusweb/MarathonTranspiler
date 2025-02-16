@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 
 namespace MarathonTranspiler.Core
 {
-    public class TranspiledProperty
+    public class InjectedDependency
     {
-        public string Name { get; set; }
         public string Type { get; set; }
-        public string StateName { get; set; }
-        public string StateId { get; set; }
+        public string Name { get; set; }
+        public string ParameterName => Name.TrimStart('_'); // Convert _logger to logger for parameter
     }
 }

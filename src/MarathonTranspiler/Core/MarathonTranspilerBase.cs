@@ -48,8 +48,14 @@ namespace MarathonTranspiler.Core
                 case "onEvent":
                     ProcessEvent(currentClass, block);
                     break;
+
+                case "inject":
+                    ProcessInject(currentClass, block);
+                    break;
             }
         }
+
+        protected virtual void ProcessInject(TranspiledClass currentClass, AnnotatedCode block) { }
 
         protected virtual void ProcessVarInit(TranspiledClass currentClass, AnnotatedCode block)
         {

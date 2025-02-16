@@ -45,11 +45,17 @@ namespace MarathonTranspiler.Transpilers.Orleans
                 if (annotation.Values.Any(v => v.Key == "stateName"))
                 {
                     var stateName = annotation.Values.First(v => v.Key == "stateName").Value;
+
+                    var stateId = annotation.Values
+                .FirstOrDefault(v => v.Key == "stateId")
+                .Value;
+
                     currentClass.Properties.Add(new TranspiledProperty
                     {
                         Name = propertyName,
                         Type = type,
-                        StateName = stateName  // New property in TranspiledProperty
+                        StateName = stateName,
+                        StateId = stateId, // New property in TranspiledProperty
                     });
                     // Don't add to constructor lines as we'll handle in property
                 }
@@ -175,15 +181,48 @@ namespace MarathonTranspiler.Transpilers.Orleans
                 }
                 if (classInfo.Properties.Any()) sb.AppendLine();
 
-                // Add state if stateful
+                // Add state field if stateful
                 if (_config.Stateful)
                 {
                     sb.AppendLine($"\tprivate IPersistentState<{classInfo.ClassName}State> _state;");
                     sb.AppendLine();
+                }
+
+                // Constructor with injections and state
+                if (_config.Stateful || classInfo.Injections.Any())
+                {
                     sb.AppendLine($"\tpublic {classInfo.ClassName}(");
-                    sb.AppendLine($"\t\t[PersistentState(\"{classInfo.ClassName}\")] IPersistentState<{classInfo.ClassName}State> state)");
+
+                    var parameters = new List<string>();
+
+                    // Add injected dependencies first
+                    foreach (var injection in classInfo.Injections)
+                    {
+                        parameters.Add($"\t\t{injection.Type} {injection.ParameterName}");
+                    }
+
+                    // Add state if stateful
+                    if (_config.Stateful)
+                    {
+                        parameters.Add($"\t\t[PersistentState(\"{classInfo.ClassName}\")] IPersistentState<{classInfo.ClassName}State> state");
+                    }
+
+                    sb.AppendLine(string.Join(",\n", parameters));
+                    sb.AppendLine("\t)");
                     sb.AppendLine("\t{");
-                    sb.AppendLine("\t\t_state = state;");
+
+                    // Initialize injected fields
+                    foreach (var injection in classInfo.Injections)
+                    {
+                        sb.AppendLine($"\t\tthis.{injection.Name} = {injection.ParameterName};");
+                    }
+
+                    // Initialize state if stateful
+                    if (_config.Stateful)
+                    {
+                        sb.AppendLine("\t\t_state = state;");
+                    }
+
                     sb.AppendLine("\t}");
                     sb.AppendLine();
                 }
@@ -216,10 +255,19 @@ namespace MarathonTranspiler.Transpilers.Orleans
                 // Generate state class if stateful
                 if (_config.Stateful)
                 {
+                    if (!string.IsNullOrEmpty(_config.StorageProvider))
+                    {
+                        sb.AppendLine($"[StorageProvider(ProviderName = \"{_config.StorageProvider}\")]");
+                    }
+                    sb.AppendLine("[GenerateSerializer]");
                     sb.AppendLine($"public class {classInfo.ClassName}State {{");
                     foreach (var prop in classInfo.Properties.Where(p => !string.IsNullOrEmpty(p.StateName)))
                     {
                         sb.AppendLine($"\t[JsonProperty]");
+                        if (!string.IsNullOrEmpty(prop.StateId))
+                        {
+                            sb.AppendLine($"\t[Id({prop.StateId})]");
+                        }
                         sb.AppendLine($"\tpublic {prop.Type} {prop.StateName} {{ get; set; }}");
                     }
                     sb.AppendLine("}");
@@ -262,6 +310,20 @@ namespace MarathonTranspiler.Transpilers.Orleans
                 _ => $"Assert.True({condition}, \"{message}\");"
             };
             currentClass.TestSteps.Add(new TestStep { Code = assertLine, IsAssertion = true });
+        }
+
+        protected override void ProcessInject(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            var annotation = block.Annotations[0];
+            var type = annotation.Values.First(v => v.Key == "type").Value;
+            var name = annotation.Values.First(v => v.Key == "name").Value;
+
+            currentClass.Injections.Add(new InjectedDependency
+            {
+                Type = type,
+                Name = name
+            });
+            currentClass.Fields.Add($"private readonly {type} {name};");
         }
     }
 }

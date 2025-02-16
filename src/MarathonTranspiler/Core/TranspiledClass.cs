@@ -18,5 +18,6 @@ namespace MarathonTranspiler.Core
         public string BaseClass { get; set; }
         public Dictionary<string, List<string>> AdditionalData { get; set; } = new();
         public List<TestStep> TestSteps { get; set; } = new();
+        public List<InjectedDependency> Injections { get; set; } = new();
     }
 }

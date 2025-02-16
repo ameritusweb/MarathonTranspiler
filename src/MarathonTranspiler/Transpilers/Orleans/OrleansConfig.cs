@@ -20,5 +20,8 @@ namespace MarathonTranspiler.Transpilers.Orleans
 
         [JsonPropertyName("testFramework")]
         public string TestFramework { get; set; } = "xunit";
+
+        [JsonPropertyName("storageProvider")]
+        public string? StorageProvider { get; set; }
     }
 }
