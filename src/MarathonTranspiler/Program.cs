@@ -1,7 +1,8 @@
-﻿using Microsoft.Extensions.FileSystemGlobbing;
+﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Readers;
+using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace MarathonTranspiler
 {
@@ -44,7 +45,8 @@ namespace MarathonTranspiler
             foreach (var file in matchingResult.Files)
             {
                 var fullPath = Path.Combine(rootDirectory, file.Path);
-
+                var marathonReader = new MarathonReader();
+                var annotatedCode = marathonReader.ReadFile(fullPath);
             }
         }
     }

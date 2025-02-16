@@ -1,4 +1,9 @@
-﻿using System;
+﻿using MarathonTranspiler.Transpilers.CSharp;
+using MarathonTranspiler.Transpilers.Orleans;
+using MarathonTranspiler.Transpilers.Python;
+using MarathonTranspiler.Transpilers.React;
+using MarathonTranspiler.Transpilers.Unity;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,5 +16,20 @@ namespace MarathonTranspiler
     {
         [JsonPropertyName("target")]
         public string Target { get; set; }
+
+        [JsonPropertyName("csharp")]
+        public CSharpConfig CSharp { get; set; }
+
+        [JsonPropertyName("orleans")]
+        public OrleansConfig Orleans { get; set; }
+
+        [JsonPropertyName("unity")]
+        public UnityConfig Unity { get; set; }
+
+        [JsonPropertyName("python")]
+        public PythonConfig Python { get; set; }
+
+        [JsonPropertyName("react")]
+        public ReactConfig React { get; set; }
     }
 }
