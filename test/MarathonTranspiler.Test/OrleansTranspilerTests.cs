@@ -390,5 +390,64 @@ namespace MarathonTranspiler.Test
             StringAssert.Contains("public IDisposable Timer { get; set; }", output);
             StringAssert.Contains("RegisterTimer", output);
         }
+
+        [Test]
+        public void OrleansGrain_WithAssertions_ShouldGenerateTests()
+        {
+            // Arrange
+            _transpiler = new OrleansTranspiler(new OrleansConfig
+            {
+                GrainKeyTypes = new Dictionary<string, string>
+        {
+            { "CounterGrain", "string" }
+        }
+            });
+
+            var initCode = new AnnotatedCode
+            {
+                Annotations = new List<Annotation>
+        {
+            new Annotation
+            {
+                Name = "varInit",
+                Values = new List<KeyValuePair<string, string>>
+                {
+                    new("className", "CounterGrain"),
+                    new("type", "int")
+                }
+            }
+        },
+                Code = new List<string> { "this.Count = 0;" }
+            };
+
+            var assertCode = new AnnotatedCode
+            {
+                Annotations = new List<Annotation>
+        {
+            new Annotation
+            {
+                Name = "assert",
+                Values = new List<KeyValuePair<string, string>>
+                {
+                    new("className", "CounterGrain"),
+                    new("condition", "this.Count == 0")
+                }
+            }
+        },
+                Code = new List<string> { "Counter should start at zero" }
+            };
+
+            _annotatedCode.Add(initCode);
+            _annotatedCode.Add(assertCode);
+
+            // Act
+            _transpiler.ProcessAnnotatedCode(_annotatedCode);
+            var output = _transpiler.GenerateOutput();
+
+            // Assert
+            StringAssert.Contains("public class CounterGrainTests", output);
+            StringAssert.Contains("[Fact]", output);
+            StringAssert.Contains("Assert.True(this.Count == 0, \"Counter should start at zero\");", output);
+        }
     }
 }

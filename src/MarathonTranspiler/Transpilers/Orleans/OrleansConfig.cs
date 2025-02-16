@@ -17,5 +17,8 @@ namespace MarathonTranspiler.Transpilers.Orleans
 
         [JsonPropertyName("streams")]
         public Dictionary<string, List<string>> Streams { get; set; }
+
+        [JsonPropertyName("testFramework")]
+        public string TestFramework { get; set; } = "xunit";
     }
 }

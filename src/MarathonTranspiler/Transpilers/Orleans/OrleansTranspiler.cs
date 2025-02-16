@@ -179,9 +179,42 @@ namespace MarathonTranspiler.Transpilers.Orleans
                     }
                     sb.AppendLine("}");
                 }
+
+                // After generating the grain and state classes...
+                if (classInfo.Assertions.Any())
+                {
+                    var testAttribute = _config.TestFramework.ToLower() switch
+                    {
+                        "nunit" => "[Test]",
+                        _ => "[Fact]" // xunit default
+                    };
+
+                    sb.AppendLine($"public class {classInfo.ClassName}Tests {{");
+                    sb.AppendLine($"\t{testAttribute}");
+                    sb.AppendLine($"\tpublic async Task TestAssertions() {{");
+                    sb.AppendLine($"\t\tvar grain = await _cluster.CreateGrainAsync<{classInfo.ClassName}>();");
+                    foreach (var assertion in classInfo.Assertions)
+                    {
+                        sb.AppendLine($"\t\t{assertion}");
+                    }
+                    sb.AppendLine("\t}");
+                    sb.AppendLine("}");
+                }
             }
 
             return sb.ToString();
+        }
+
+        protected override void ProcessAssert(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            var condition = block.Annotations[0].Values.First(v => v.Key == "condition").Value;
+            var message = block.Code[0].Trim('"');
+            string assertLine = _config.TestFramework.ToLower() switch
+            {
+                "nunit" => $"Assert.That({condition}, \"{message}\");",
+                _ => $"Assert.True({condition}, \"{message}\");" // xunit default
+            };
+            currentClass.Assertions.Add(assertLine);
         }
     }
 }
