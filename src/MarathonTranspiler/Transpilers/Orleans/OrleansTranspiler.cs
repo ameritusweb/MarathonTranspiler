@@ -65,6 +65,17 @@ namespace MarathonTranspiler.Transpilers.Orleans
             }
 
             method.Code.AddRange(block.Code);
+
+            // Add test step for method call
+            var parameters = block.Annotations.Skip(1)
+                .Where(a => a.Name == "parameter")
+                .Select(a => a.Values.First(v => v.Key == "value").Value);
+
+            var methodCall = parameters.Any()
+                ? $"await grain.{functionName}({string.Join(", ", parameters)});"
+                : $"await grain.{functionName}();";
+
+            currentClass.TestSteps.Add(new TestStep { Code = methodCall, IsAssertion = false });
         }
 
         public override string GenerateOutput()
@@ -181,22 +192,24 @@ namespace MarathonTranspiler.Transpilers.Orleans
                 }
 
                 // After generating the grain and state classes...
-                if (classInfo.Assertions.Any())
+                if (classInfo.TestSteps.Any(x => x.IsAssertion))
                 {
                     var testAttribute = _config.TestFramework.ToLower() switch
                     {
                         "nunit" => "[Test]",
-                        _ => "[Fact]" // xunit default
+                        _ => "[Fact]"
                     };
 
                     sb.AppendLine($"public class {classInfo.ClassName}Tests {{");
                     sb.AppendLine($"\t{testAttribute}");
                     sb.AppendLine($"\tpublic async Task TestAssertions() {{");
                     sb.AppendLine($"\t\tvar grain = await _cluster.CreateGrainAsync<{classInfo.ClassName}>();");
-                    foreach (var assertion in classInfo.Assertions)
+
+                    foreach (var step in classInfo.TestSteps)
                     {
-                        sb.AppendLine($"\t\t{assertion}");
+                        sb.AppendLine($"\t\t{step.Code}");
                     }
+
                     sb.AppendLine("\t}");
                     sb.AppendLine("}");
                 }
@@ -212,9 +225,9 @@ namespace MarathonTranspiler.Transpilers.Orleans
             string assertLine = _config.TestFramework.ToLower() switch
             {
                 "nunit" => $"Assert.That({condition}, \"{message}\");",
-                _ => $"Assert.True({condition}, \"{message}\");" // xunit default
+                _ => $"Assert.True({condition}, \"{message}\");"
             };
-            currentClass.Assertions.Add(assertLine);
+            currentClass.TestSteps.Add(new TestStep { Code = assertLine, IsAssertion = true });
         }
     }
 }

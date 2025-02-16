@@ -310,7 +310,8 @@ namespace MarathonTranspiler.Test
                 Values = new List<KeyValuePair<string, string>>
                 {
                     new("name", "orderEvent"),
-                    new("type", "OrderEvent")
+                    new("type", "OrderEvent"),
+                    new("value", "new OrderEvent()")
                 }
             }
         },
