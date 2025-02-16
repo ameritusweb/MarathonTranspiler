@@ -19,7 +19,7 @@ namespace MarathonTranspiler.Transpilers.React
             this._config = config;
         }
 
-        protected override void ProcessBlock(AnnotatedCode block)
+        protected override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
 
@@ -30,7 +30,7 @@ namespace MarathonTranspiler.Transpilers.React
             }
             else
             {
-                base.ProcessBlock(block);
+                base.ProcessBlock(block, previousBlock);
             }
         }
 

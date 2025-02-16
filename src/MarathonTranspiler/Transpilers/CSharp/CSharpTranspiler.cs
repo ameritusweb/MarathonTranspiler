@@ -16,7 +16,7 @@ namespace MarathonTranspiler.Transpilers.CSharp
             _config = config;
         }
 
-        protected override void ProcessBlock(AnnotatedCode block)
+        protected override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
             var className = mainAnnotation.Values.First(v => v.Key == "className").Value;
@@ -50,30 +50,61 @@ namespace MarathonTranspiler.Transpilers.CSharp
 
                 case "run":
                     var functionName = mainAnnotation.Values.First(v => v.Key == "functionName").Value;
-                    var method = GetOrCreateMethod(currentClass, functionName);
 
-                    foreach (var annotation in block.Annotations.Skip(1))
+                    // If we're between enumerable start/end blocks
+                    if (previousBlock != null &&
+                        previousBlock.Annotations[0].Values.Any(v => v.Key == "enumerableStart"))
                     {
-                        if (annotation.Name == "parameter")
-                        {
-                            var param = $"{annotation.Values.First(v => v.Key == "type").Value} {annotation.Values.First(v => v.Key == "name").Value}";
-                            if (!method.Parameters.Contains(param))
-                            {
-                                method.Parameters.Add(param);
-                            }
-                        }
-                    }
+                        // Get the previous class and method
+                        var prevAnnotation = previousBlock.Annotations[0];
+                        var prevClassName = prevAnnotation.Values.First(v => v.Key == "className").Value;
+                        var prevMethodName = prevAnnotation.Values.First(v => v.Key == "functionName").Value;
 
-                    method.Code.AddRange(block.Code);
+                        var containerClass = _classes[prevClassName];
+                        var containerMethod = GetOrCreateMethod(containerClass, prevMethodName);
 
-                    if (!mainAnnotation.Values.Any(v => v.Key == "enumerableStart" || v.Key == "enumerableEnd"))
-                    {
+                        // Add this code to the container method
                         var paramValues = block.Annotations.Skip(1)
                             .Where(a => a.Name == "parameter")
                             .Select(a => a.Values.First(v => v.Key == "value").Value);
 
-                        var instanceName = char.ToLower(className[0]) + className.Substring(1);
-                        _mainMethodLines.Add($"{instanceName}.{functionName}({string.Join(", ", paramValues)});");
+                        var loggerProperty = containerClass.Properties
+                            .First(p => p.Type == className);
+
+                        containerMethod.Code.Add($"\t\tthis.{loggerProperty.Name}.{functionName}({string.Join(", ", paramValues)});");
+                    }
+                    else
+                    {
+                        var method = GetOrCreateMethod(currentClass, functionName);
+
+                        foreach (var annotation in block.Annotations.Skip(1))
+                        {
+                            if (annotation.Name == "parameter")
+                            {
+                                var param = $"{annotation.Values.First(v => v.Key == "type").Value} {annotation.Values.First(v => v.Key == "name").Value}";
+                                if (!method.Parameters.Contains(param))
+                                {
+                                    method.Parameters.Add(param);
+                                }
+                            }
+                        }
+
+                        method.Code.AddRange(block.Code);
+
+                        // Add to main lines if it's either:
+                        // 1. A regular method call (not enumerable related)
+                        // 2. The start of an enumerable block
+                        var isEnumerable = mainAnnotation.Values.Any(v =>
+                            v.Key == "enumerableStart" || v.Key == "enumerableEnd");
+
+                        if (!isEnumerable || mainAnnotation.Values.Any(v => v.Key == "enumerableStart"))
+                        {
+                            var targetName = char.ToLower(className[0]) + className.Substring(1);
+                            var paramValues = block.Annotations.Skip(1)
+                                .Where(a => a.Name == "parameter")
+                                .Select(a => a.Values.First(v => v.Key == "value").Value);
+                            _mainMethodLines.Add($"{targetName}.{functionName}({string.Join(", ", paramValues)});");
+                        }
                     }
                     break;
             }

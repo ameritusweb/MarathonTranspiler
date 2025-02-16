@@ -19,7 +19,7 @@ namespace MarathonTranspiler.Transpilers.Python
             _imports.Add("from typing import List, Dict, Optional");
         }
 
-        protected override void ProcessBlock(AnnotatedCode block)
+        protected override void ProcessBlock(AnnotatedCode block, AnnotatedCode previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
             var className = mainAnnotation.Values.First(v => v.Key == "className").Value;

@@ -13,13 +13,15 @@ namespace MarathonTranspiler.Core
 
         public void ProcessAnnotatedCode(List<AnnotatedCode> annotatedCodes)
         {
+            AnnotatedCode? previousBlock = null;
             foreach (var block in annotatedCodes)
             {
-                ProcessBlock(block);
+                ProcessBlock(block, previousBlock);
+                previousBlock = block;
             }
         }
 
-        protected virtual void ProcessBlock(AnnotatedCode block)
+        protected virtual void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
             var className = mainAnnotation.Values.First(v => v.Key == "className").Value;

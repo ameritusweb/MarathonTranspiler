@@ -37,7 +37,7 @@ namespace MarathonTranspiler.Transpilers.Wpf
             this._config = config;
         }
 
-        protected override void ProcessBlock(AnnotatedCode block)
+        protected override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
             var className = mainAnnotation.Values.First(v => v.Key == "className").Value;
@@ -98,7 +98,7 @@ namespace MarathonTranspiler.Transpilers.Wpf
                     break;
 
                 default:
-                    base.ProcessBlock(block);
+                    base.ProcessBlock(block, previousBlock);
                     break;
             }
         }

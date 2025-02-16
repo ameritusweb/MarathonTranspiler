@@ -1,0 +1,32 @@
+﻿@varInit(className="FileLogger", type="string")
+private static readonly string filePath = "E:\\log.txt";
+
+@varInit(className="Calculator", type="float")
+this.Value = 0f;
+
+@varInit(className="Calculator", type="List<float>")
+this.History = new List<float>();
+
+@varInit(className="Calculator", type="FileLogger")
+this.Logger = new FileLogger();
+
+@run(className="Calculator", functionName="Add")
+@parameter(name="x", type="float", value="2f")
+this.History.Add(this.Value);
+this.Value += x;
+
+@run(className="Calculator", functionName="Display")
+Console.WriteLine("Calculated value: " + this.Value);
+
+@run(className="Calculator" functionName="DisplayHistory" enumerableStart="true")
+foreach (var value in this.History) {
+
+@run(className="FileLogger", functionName="AppendLine")
+@parameter(name="message", type="string", value="value")
+var lines = File.ReadAllLines(filePath);
+lines.Add(message);
+File.WriteAllLines(filePath, lines);
+
+@run(className="Calculator" functionName="DisplayHistory" enumerableEnd="true")
+	Console.WriteLine("Historical value: " + value);
+}
