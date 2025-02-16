@@ -14,5 +14,7 @@ namespace MarathonTranspiler.Core
         public List<TranspiledMethod> Methods { get; set; } = new();
         public List<string> ConstructorLines { get; set; } = new();
         public List<string> Assertions { get; set; } = new();
+        public bool IsAbstract { get; set; }
+        public string BaseClass { get; set; }
     }
 }
