@@ -47,6 +47,14 @@ namespace MarathonTranspiler
                 var fullPath = Path.Combine(rootDirectory, file.Path);
                 var marathonReader = new MarathonReader();
                 var annotatedCode = marathonReader.ReadFile(fullPath);
+
+                var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions);
+                transpiler.ProcessAnnotatedCode(annotatedCode);
+                var outputCode = transpiler.GenerateOutput();
+
+                // Write the transpiled code to a .cs file
+                var outputPath = Path.ChangeExtension(fullPath, ".cs");
+                File.WriteAllText(outputPath, outputCode);
             }
         }
     }

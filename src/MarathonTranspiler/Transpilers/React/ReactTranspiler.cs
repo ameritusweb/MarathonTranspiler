@@ -12,6 +12,12 @@ namespace MarathonTranspiler.Transpilers.React
         private readonly StringBuilder _jsxOutput = new();
         private readonly HashSet<string> _imports = new() { "import React from 'react';" };
         private readonly Dictionary<string, List<string>> _customHooks = new();
+        private readonly ReactConfig _config;
+
+        public ReactTranspiler(ReactConfig config)
+        {
+            this._config = config;
+        }
 
         protected override void ProcessBlock(AnnotatedCode block)
         {
