@@ -80,6 +80,7 @@ namespace MarathonTranspiler.Transpilers.Orleans
             var method = GetOrCreateMethod(currentClass, functionName);
 
             // Set method properties
+            method.Id = annotation.Values.GetValue("id", string.Empty);
             method.ReturnType = annotation.Values.GetValue("returnType", "void");
             method.Modifier = annotation.Values.GetValue("modifier", "public");
 
@@ -98,15 +99,6 @@ namespace MarathonTranspiler.Transpilers.Orleans
             }
 
             method.Code.AddRange(block.Code);
-
-            // Store code by ID if present
-            if (annotation.Values.Any(v => v.Key == "id"))
-            {
-                var id = annotation.Values.First(v => v.Key == "id").Value;
-                if (!method.CodeById.ContainsKey(id))
-                    method.CodeById[id] = new List<string>();
-                method.CodeById[id].AddRange(block.Code);
-            }
 
             if (!isAutomatic)
             {
@@ -128,22 +120,43 @@ namespace MarathonTranspiler.Transpilers.Orleans
             var annotation = block.Annotations[0];
             var id = annotation.Values.First(v => v.Key == "id").Value;
 
-            // Find method containing this id
-            var method = currentClass.Methods.FirstOrDefault(m => m.CodeById.ContainsKey(id));
+            var method = currentClass.Methods.FirstOrDefault(m => m.Id == id);
+            int insertIndex = -1;
+
+            if (method == null)
+            {
+                method = currentClass.Methods.FirstOrDefault(x => x.IndexById.Any(y => y.Key == id));
+                insertIndex = method.IndexById[id];
+            }
+            else
+            {
+                insertIndex = method.Code.Count;
+            }
+
             if (method != null)
             {
                 if (block.Annotations.Any(a => a.Name == "condition"))
                 {
+                    var conditionAnnotation = block.Annotations.First(x => x.Name == "condition");
                     var expression = block.Annotations.First(a => a.Name == "condition")
                                                     .Values.First(v => v.Key == "expression").Value;
-                    method.CodeById[id].Add($"if ({expression})");
-                    method.CodeById[id].Add("{");
-                    method.CodeById[id].AddRange(block.Code.Select(line => $"\t{line}"));
-                    method.CodeById[id].Add("}");
+                    List<string> cblock = new List<string>();
+                    cblock.Add($"if ({expression})");
+                    cblock.Add("{");
+                    cblock.AddRange(block.Code.Select(line => $"\t{line}"));
+                    cblock.Add("}");
+
+                    method.Code.InsertRange(insertIndex, cblock);
+
+                    var conditionId = conditionAnnotation.Values.GetValue("id");
+                    if (!string.IsNullOrEmpty(conditionId))
+                    {
+                        method.IndexById[conditionId] = method.Code.Count - 1;
+                    }
                 }
                 else
                 {
-                    method.CodeById[id].AddRange(block.Code);
+                    method.Code.InsertRange(insertIndex, block.Code);
                 }
             }
         }
@@ -280,22 +293,10 @@ namespace MarathonTranspiler.Transpilers.Orleans
                 {
                     var parameters = string.Join(", ", method.Parameters);
                     sb.AppendLine($"\tpublic async Task {method.Name}({parameters}) {{");
-                    if (method.CodeById.Keys.Any())
+
+                    foreach (var line in method.Code)
                     {
-                        foreach (var code in method.CodeById.Values)
-                        {
-                            foreach (var line in code)
-                            {
-                                sb.AppendLine($"\t\t{line}");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        foreach (var line in method.Code)
-                        {
-                            sb.AppendLine($"\t\t{line}");
-                        }
+                        sb.AppendLine($"\t\t{line}");
                     }
 
                     sb.AppendLine("\t}");

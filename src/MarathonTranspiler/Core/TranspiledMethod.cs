@@ -8,6 +8,7 @@ namespace MarathonTranspiler.Core
 {
     public class TranspiledMethod
     {
+        public string Id { get; set; }
         public string Name { get; set; }
         public List<string> Parameters { get; set; } = new();
         public List<string> Code { get; set; } = new();
@@ -18,6 +19,6 @@ namespace MarathonTranspiler.Core
         public bool IsProperty { get; set; }
         public bool IsCoroutine { get; set; }
         public bool IsAutomatic { get; set; }
-        public Dictionary<string, List<string>> CodeById { get; set; } = new();
+        public Dictionary<string, int> IndexById { get; set; } = new();
     }
 }
