@@ -119,43 +119,67 @@ namespace MarathonTranspiler.Transpilers.Orleans
         {
             var annotation = block.Annotations[0];
             var id = annotation.Values.First(v => v.Key == "id").Value;
-
             var method = currentClass.Methods.FirstOrDefault(m => m.Id == id);
             int insertIndex = -1;
 
             if (method == null)
             {
-                method = currentClass.Methods.FirstOrDefault(x => x.IndexById.Any(y => y.Key == id));
-                insertIndex = method.IndexById[id];
+                method = currentClass.Methods.FirstOrDefault(x => x.IndexById.ContainsKey(id));
+                if (method != null)
+                {
+                    insertIndex = method.IndexById[id];
+                }
             }
             else
             {
                 insertIndex = method.Code.Count;
             }
 
-            if (method != null)
+            if (method != null && insertIndex != -1)
             {
                 if (block.Annotations.Any(a => a.Name == "condition"))
                 {
                     var conditionAnnotation = block.Annotations.First(x => x.Name == "condition");
-                    var expression = block.Annotations.First(a => a.Name == "condition")
-                                                    .Values.First(v => v.Key == "expression").Value;
+                    var expression = conditionAnnotation.Values.First(v => v.Key == "expression").Value;
+                    var conditionId = conditionAnnotation.Values.GetValue("id");
+
                     List<string> cblock = new List<string>();
                     cblock.Add($"if ({expression})");
                     cblock.Add("{");
                     cblock.AddRange(block.Code.Select(line => $"\t{line}"));
                     cblock.Add("}");
 
+                    // Calculate how many lines we're about to insert
+                    int insertedLines = cblock.Count;
+
+                    // Adjust all subsequent indexes
+                    foreach (var kvp in method.IndexById.ToList())
+                    {
+                        if (kvp.Value >= insertIndex)
+                        {
+                            method.IndexById[kvp.Key] += insertedLines;
+                        }
+                    }
+
                     method.Code.InsertRange(insertIndex, cblock);
 
-                    var conditionId = conditionAnnotation.Values.GetValue("id");
                     if (!string.IsNullOrEmpty(conditionId))
                     {
-                        method.IndexById[conditionId] = method.Code.Count - 1;
+                        method.IndexById[conditionId] = insertIndex + insertedLines - 1;
                     }
                 }
                 else
                 {
+                    // Adjust indexes for non-conditional inserts too
+                    int insertedLines = block.Code.Count;
+                    foreach (var kvp in method.IndexById.ToList())
+                    {
+                        if (kvp.Value >= insertIndex)
+                        {
+                            method.IndexById[kvp.Key] += insertedLines;
+                        }
+                    }
+
                     method.Code.InsertRange(insertIndex, block.Code);
                 }
             }
