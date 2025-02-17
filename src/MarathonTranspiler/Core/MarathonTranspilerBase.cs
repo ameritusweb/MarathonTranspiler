@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MarathonTranspiler.Extensions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,6 +11,7 @@ namespace MarathonTranspiler.Core
     {
         protected readonly Dictionary<string, TranspiledClass> _classes = new();
         protected readonly List<string> _mainMethodLines = new();
+        protected readonly Dictionary<string, string> _idToClassNameMap = new();
 
         public void ProcessAnnotatedCode(List<AnnotatedCode> annotatedCodes)
         {
@@ -24,7 +26,27 @@ namespace MarathonTranspiler.Core
         protected virtual void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
-            var className = mainAnnotation.Values.First(v => v.Key == "className").Value;
+            var className = mainAnnotation.Values.GetValue("className", string.Empty);
+
+            if (className == string.Empty && mainAnnotation.Name == "more")
+            {
+                var cid = mainAnnotation.Values.GetValue("id", string.Empty);
+                className = _idToClassNameMap[cid];
+            }
+
+            foreach (var a in block.Annotations)
+            {
+                var id = a.Values.GetValue("id", string.Empty);
+                if (id != string.Empty && className != string.Empty && !_idToClassNameMap.ContainsKey(id))
+                {
+                    _idToClassNameMap.Add(id, className);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(className))
+            {
+                throw new Exception("Class name not found.");
+            }
 
             if (!_classes.ContainsKey(className))
             {
@@ -53,6 +75,10 @@ namespace MarathonTranspiler.Core
 
                 case "inject":
                     ProcessInject(currentClass, block);
+                    break;
+
+                case "more":
+                    ProcessMore(currentClass, block);
                     break;
             }
         }
@@ -122,6 +148,11 @@ namespace MarathonTranspiler.Core
             {
                 currentClass.Assertions.Add($"Assert.True({condition}, \"{message}\");");
             }
+        }
+
+        protected virtual void ProcessMore(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            // Platform-specific event handling to be implemented by derived classes
         }
 
         protected virtual void ProcessEvent(TranspiledClass currentClass, AnnotatedCode block)

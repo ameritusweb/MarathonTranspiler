@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MarathonTranspiler.Extensions;
 
 namespace MarathonTranspiler.Transpilers.Orleans
 {
@@ -31,43 +32,43 @@ namespace MarathonTranspiler.Transpilers.Orleans
 
         protected override void ProcessVarInit(TranspiledClass currentClass, AnnotatedCode block)
         {
-            if (!block.Code[0].StartsWith("this."))
+            var annotation = block.Annotations[0];
+            var type = annotation.Values.First(v => v.Key == "type").Value;
+            var propertyName = block.Code[0].Split('=')[0].Replace("this.", "").Trim();
+            var initialValue = block.Code[0].Split('=')[1].Trim().Replace(";", "");
+
+            if (annotation.Values.Any(v => v.Key == "stateName"))
+            {
+                var stateName = annotation.Values.First(v => v.Key == "stateName").Value;
+                var stateId = annotation.Values.FirstOrDefault(v => v.Key == "stateId").Value;
+
+                currentClass.Properties.Add(new TranspiledProperty
+                {
+                    Name = propertyName,
+                    Type = type,
+                    StateName = stateName,
+                    StateId = stateId,
+                    Code = !block.Code[0].StartsWith("this.") ? block.Code[0].Trim() : null,
+                });
+
+                if (block.Code[0].StartsWith("this."))
+                {
+                    // Add initialization to constructor
+                    currentClass.ConstructorLines.Add($"this.{propertyName} = {initialValue};");
+                }
+            }
+            else if (!block.Code[0].StartsWith("this."))
             {
                 currentClass.Fields.Add(block.Code[0]);
             }
             else
             {
-                var annotation = block.Annotations[0];
-                var type = annotation.Values.First(v => v.Key == "type").Value;
-                var propertyName = block.Code[0].Split('=')[0].Replace("this.", "").Trim();
-
-                // Check if this should be a state property
-                if (annotation.Values.Any(v => v.Key == "stateName"))
+                currentClass.Properties.Add(new TranspiledProperty
                 {
-                    var stateName = annotation.Values.First(v => v.Key == "stateName").Value;
-
-                    var stateId = annotation.Values
-                .FirstOrDefault(v => v.Key == "stateId")
-                .Value;
-
-                    currentClass.Properties.Add(new TranspiledProperty
-                    {
-                        Name = propertyName,
-                        Type = type,
-                        StateName = stateName,
-                        StateId = stateId, // New property in TranspiledProperty
-                    });
-                    // Don't add to constructor lines as we'll handle in property
-                }
-                else
-                {
-                    currentClass.Properties.Add(new TranspiledProperty
-                    {
-                        Name = propertyName,
-                        Type = type
-                    });
-                    currentClass.ConstructorLines.Add(block.Code[0]);
-                }
+                    Name = propertyName,
+                    Type = type
+                });
+                currentClass.ConstructorLines.Add(block.Code[0]);
             }
         }
 
@@ -75,7 +76,12 @@ namespace MarathonTranspiler.Transpilers.Orleans
         {
             var annotation = block.Annotations[0];
             var functionName = annotation.Values.First(v => v.Key == "functionName").Value;
+            var isAutomatic = annotation.Values.First(v => v.Key == "isAutomatic").Value == "true";
             var method = GetOrCreateMethod(currentClass, functionName);
+
+            // Set method properties
+            method.ReturnType = annotation.Values.GetValue("returnType", "void");
+            method.Modifier = annotation.Values.GetValue("modifier", "public");
 
             foreach (var paramAnnotation in block.Annotations.Skip(1))
             {
@@ -93,16 +99,53 @@ namespace MarathonTranspiler.Transpilers.Orleans
 
             method.Code.AddRange(block.Code);
 
-            // Add test step for method call
-            var parameters = block.Annotations.Skip(1)
-                .Where(a => a.Name == "parameter")
-                .Select(a => a.Values.First(v => v.Key == "value").Value);
+            // Store code by ID if present
+            if (annotation.Values.Any(v => v.Key == "id"))
+            {
+                var id = annotation.Values.First(v => v.Key == "id").Value;
+                if (!method.CodeById.ContainsKey(id))
+                    method.CodeById[id] = new List<string>();
+                method.CodeById[id].AddRange(block.Code);
+            }
 
-            var methodCall = parameters.Any()
-                ? $"await grain.{functionName}({string.Join(", ", parameters)});"
-                : $"await grain.{functionName}();";
+            if (!isAutomatic)
+            {
+                // Add test step for method call
+                var parameters = block.Annotations.Skip(1)
+                    .Where(a => a.Name == "parameter")
+                    .Select(a => a.Values.First(v => v.Key == "value").Value);
 
-            currentClass.TestSteps.Add(new TestStep { Code = methodCall, IsAssertion = false });
+                var methodCall = parameters.Any()
+                    ? $"await grain.{functionName}({string.Join(", ", parameters)});"
+                    : $"await grain.{functionName}();";
+
+                currentClass.TestSteps.Add(new TestStep { Code = methodCall, IsAssertion = false });
+            }
+        }
+
+        protected override void ProcessMore(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            var annotation = block.Annotations[0];
+            var id = annotation.Values.First(v => v.Key == "id").Value;
+
+            // Find method containing this id
+            var method = currentClass.Methods.FirstOrDefault(m => m.CodeById.ContainsKey(id));
+            if (method != null)
+            {
+                if (block.Annotations.Any(a => a.Name == "condition"))
+                {
+                    var expression = block.Annotations.First(a => a.Name == "condition")
+                                                    .Values.First(v => v.Key == "expression").Value;
+                    method.CodeById[id].Add($"if ({expression})");
+                    method.CodeById[id].Add("{");
+                    method.CodeById[id].AddRange(block.Code.Select(line => $"\t{line}"));
+                    method.CodeById[id].Add("}");
+                }
+                else
+                {
+                    method.CodeById[id].AddRange(block.Code);
+                }
+            }
         }
 
         public override string GenerateOutput()
@@ -223,6 +266,11 @@ namespace MarathonTranspiler.Transpilers.Orleans
                         sb.AppendLine("\t\t_state = state;");
                     }
 
+                    foreach (var line in classInfo.ConstructorLines)
+                    {
+                        sb.AppendLine($"\t\t{line}");
+                    }
+
                     sb.AppendLine("\t}");
                     sb.AppendLine();
                 }
@@ -232,14 +280,24 @@ namespace MarathonTranspiler.Transpilers.Orleans
                 {
                     var parameters = string.Join(", ", method.Parameters);
                     sb.AppendLine($"\tpublic async Task {method.Name}({parameters}) {{");
-                    foreach (var line in method.Code)
+                    if (method.CodeById.Keys.Any())
                     {
-                        sb.AppendLine($"\t\t{line}");
+                        foreach (var code in method.CodeById.Values)
+                        {
+                            foreach (var line in code)
+                            {
+                                sb.AppendLine($"\t\t{line}");
+                            }
+                        }
                     }
-                    if (_config.Stateful)
+                    else
                     {
-                        sb.AppendLine("\t\tawait _state.WriteStateAsync();");
+                        foreach (var line in method.Code)
+                        {
+                            sb.AppendLine($"\t\t{line}");
+                        }
                     }
+
                     sb.AppendLine("\t}");
                     sb.AppendLine();
                 }
@@ -268,7 +326,15 @@ namespace MarathonTranspiler.Transpilers.Orleans
                         {
                             sb.AppendLine($"\t[Id({prop.StateId})]");
                         }
-                        sb.AppendLine($"\tpublic {prop.Type} {prop.StateName} {{ get; set; }}");
+
+                        if (prop.Code != null)
+                        {
+                            sb.AppendLine($"\t" + prop.Code);
+                        }
+                        else
+                        {
+                            sb.AppendLine($"\tpublic {prop.Type} {prop.StateName} {{ get; set; }}");
+                        }
                     }
                     sb.AppendLine("}");
                 }
@@ -296,6 +362,29 @@ namespace MarathonTranspiler.Transpilers.Orleans
                     sb.AppendLine("}");
                 }
             }
+
+            // Generate Program class
+            sb.AppendLine("public class Program {");
+            sb.AppendLine("\tpublic static async Task Main(string[] args) {");
+            sb.AppendLine("\t\tvar client = new ClientBuilder()");
+            sb.AppendLine("\t\t\t.UseLocalhostClustering()");
+            sb.AppendLine("\t\t\t.Build();");
+            sb.AppendLine("\t\tawait client.Connect();");
+
+            foreach (var className in _classes.Keys)
+            {
+                var grainType = $"I{className}";
+                var grainInstance = char.ToLower(className[0]) + className.Substring(1);
+                sb.AppendLine($"\t\tvar {grainInstance} = client.GetGrain<{grainType}>(Guid.NewGuid());");
+            }
+
+            foreach (var line in _mainMethodLines)
+            {
+                sb.AppendLine($"\t\t{line}");
+            }
+
+            sb.AppendLine("\t}");
+            sb.AppendLine("}");
 
             return sb.ToString();
         }

@@ -1,0 +1,33 @@
+﻿@varInit(className="NodeGrain", type="string?", stateName="Name")
+this.NodeName = null;
+
+@varInit(className="NodeGrain", type="double", stateName="Amplification")
+public double Amplification { get; set; } = 0.0;
+
+@varInit(className="NodeGrain", type="boolean", stateName="IsMemoryNode")
+public boolean IsMemoryNode { get; set; } = false;
+
+@varInit(className="NodeGrain", type="int", stateName="CumulativeReward")
+public int CumulativeReward { get; set; } = 0;
+
+@varInit(className="NodeGrain", type="int", stateName="TraversalCount")
+public int TraversalCount { get; set; } = -1;
+
+@run(id="activate1" className="NodeGrain", functionName="OnActivateAsync" returnType="Task" modifier="public override async" isAutomatic="true")
+@parameter(name="cancellationToken" type="CancellationToken")
+await ReadStateAsync();
+
+@more(id="activate1")
+@condition(id="activateCondition" expression="this.State.NodeName == null")
+this.State.NodeName = "MyNode";
+this.State.Amplification = 1.0;
+this.State.IsMemoryNode = false;
+this.State.CumulativeReward = 0;
+
+@more(id="activateCondition")
+@condition(expression="this.State.TraversalCount == -1")
+this.State.TraversalCount = 0;
+
+@more(id="activate1")
+await WriteStateAsync();
+await base.OnActivateAsync(cancellationToken);

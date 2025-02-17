@@ -10,6 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Examples\example3.mrt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Examples\example2.mrt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

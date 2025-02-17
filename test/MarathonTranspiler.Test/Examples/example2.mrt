@@ -1,1 +1,14 @@
-﻿
+﻿@varInit(className="NodeGrain", type="string?", stateName="Name" stateId="0")
+this.NodeName = null;
+
+@varInit(className="NodeGrain", type="double", stateName="Amplification" stateId="1")
+public double Amplification { get; set; } = 0.0;
+
+@varInit(className="NodeGrain", type="boolean", stateName="IsMemoryNode" stateId="2")
+public boolean IsMemoryNode { get; set; } = false;
+
+@varInit(className="NodeGrain", type="int", stateName="CumulativeReward" stateId="3")
+public int CumulativeReward { get; set; } = 0;
+
+@varInit(className="NodeGrain", type="int", stateName="TraversalCount" stateId="4")
+public int TraversalCount { get; set; } = -1;
