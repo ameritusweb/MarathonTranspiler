@@ -1,0 +1,34 @@
+﻿@varInit(className="Parser", type="string")
+this.Text = "";
+
+@varInit(className="Parser", type="int")
+this.Position = 0;
+
+@run(id="parse", className="Parser", functionName="Parse")
+@parameter(name="text", type="string", value="myText")
+this.Text = text;
+this.Position = 0;
+
+@more(id="parse")
+@condition(id="parseLoop" expression="this.Position < this.Text.Length")
+var currentChar = this.Text[this.Position];
+
+@more(id="parseLoop")
+@condition(expression="char.IsWhiteSpace(currentChar)")
+this.Position++;
+
+@more(id="parseLoop")
+@condition(id="identifier" expression="char.IsLetter(currentChar)")
+var identifier = "";
+
+@more(id="identifier")
+@condition(id="identifierLoop" expression="char.IsLetterOrDigit(currentChar)")
+identifier += currentChar;
+this.Position++;
+
+@more(id="identifierLoop")
+@condition(expression="this.Position < this.Text.Length")
+currentChar = this.Text[this.Position];
+
+@more(id="parse")
+Console.WriteLine($"Found identifier: {identifier}");

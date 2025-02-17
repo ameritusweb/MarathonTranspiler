@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,108 +17,134 @@ namespace MarathonTranspiler.Transpilers.CSharp
             _config = config;
         }
 
-        protected override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
+        protected override void ProcessVarInit(TranspiledClass currentClass, AnnotatedCode block)
         {
-            var mainAnnotation = block.Annotations[0];
-            var className = mainAnnotation.Values.First(v => v.Key == "className").Value;
-
-            if (!_classes.ContainsKey(className))
+            if (!block.Code[0].StartsWith("this."))
             {
-                _classes[className] = new TranspiledClass { ClassName = className };
+                currentClass.Fields.Add(block.Code[0]);
             }
-
-            var currentClass = _classes[className];
-
-            switch (mainAnnotation.Name)
+            else
             {
-                case "varInit":
-                    if (!block.Code[0].StartsWith("this."))
-                    {
-                        currentClass.Fields.Add(block.Code[0]);
-                    }
-                    else
-                    {
-                        var type = mainAnnotation.Values.First(v => v.Key == "type").Value;
-                        var propertyName = block.Code[0].Split('=')[0].Replace("this.", "").Trim();
-                        currentClass.Properties.Add(new TranspiledProperty { Name = propertyName, Type = type });
-                        currentClass.ConstructorLines.Add(block.Code[0]);
-                    }
-                    break;
-
-                case "assert":
-                    ProcessAssert(currentClass, block);
-                    break;
-
-                case "run":
-                    var functionName = mainAnnotation.Values.First(v => v.Key == "functionName").Value;
-
-                    // If we're between enumerable start/end blocks
-                    if (previousBlock != null &&
-                        previousBlock.Annotations[0].Values.Any(v => v.Key == "enumerableStart"))
-                    {
-                        // Get the previous class and method
-                        var prevAnnotation = previousBlock.Annotations[0];
-                        var prevClassName = prevAnnotation.Values.First(v => v.Key == "className").Value;
-                        var prevMethodName = prevAnnotation.Values.First(v => v.Key == "functionName").Value;
-
-                        var containerClass = _classes[prevClassName];
-                        var containerMethod = GetOrCreateMethod(containerClass, prevMethodName);
-
-                        // Add this code to the container method
-                        var paramValues = block.Annotations.Skip(1)
-                            .Where(a => a.Name == "parameter")
-                            .Select(a => a.Values.First(v => v.Key == "value").Value);
-
-                        var loggerProperty = containerClass.Properties
-                            .First(p => p.Type == className);
-
-                        containerMethod.Code.Add($"\t\tthis.{loggerProperty.Name}.{functionName}({string.Join(", ", paramValues)});");
-                    }
-                    else
-                    {
-                        var method = GetOrCreateMethod(currentClass, functionName);
-
-                        foreach (var annotation in block.Annotations.Skip(1))
-                        {
-                            if (annotation.Name == "parameter")
-                            {
-                                var param = $"{annotation.Values.First(v => v.Key == "type").Value} {annotation.Values.First(v => v.Key == "name").Value}";
-                                if (!method.Parameters.Contains(param))
-                                {
-                                    method.Parameters.Add(param);
-                                }
-                            }
-                        }
-
-                        method.Code.AddRange(block.Code);
-
-                        // Add to main lines if it's either:
-                        // 1. A regular method call (not enumerable related)
-                        // 2. The start of an enumerable block
-                        var isEnumerable = mainAnnotation.Values.Any(v =>
-                            v.Key == "enumerableStart" || v.Key == "enumerableEnd");
-
-                        if (!isEnumerable || mainAnnotation.Values.Any(v => v.Key == "enumerableStart"))
-                        {
-                            var targetName = char.ToLower(className[0]) + className.Substring(1);
-                            var paramValues = block.Annotations.Skip(1)
-                                .Where(a => a.Name == "parameter")
-                                .Select(a => a.Values.First(v => v.Key == "value").Value);
-                            _mainMethodLines.Add($"{targetName}.{functionName}({string.Join(", ", paramValues)});");
-                        }
-                    }
-                    break;
+                var type = block.Annotations[0].Values.First(v => v.Key == "type").Value;
+                var propertyName = block.Code[0].Split('=')[0].Replace("this.", "").Trim();
+                currentClass.Properties.Add(new TranspiledProperty { Name = propertyName, Type = type });
+                currentClass.ConstructorLines.Add(block.Code[0]);
             }
         }
 
-        protected virtual void ProcessAssert(TranspiledClass currentClass, AnnotatedCode block)
+        protected override void ProcessRun(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            var annotation = block.Annotations[0];
+            var functionName = annotation.Values.First(v => v.Key == "functionName").Value;
+            var method = GetOrCreateMethod(currentClass, functionName);
+
+            // Handle parameters
+            foreach (var paramAnnotation in block.Annotations.Skip(1))
+            {
+                if (paramAnnotation.Name == "parameter")
+                {
+                    var paramType = paramAnnotation.Values.First(v => v.Key == "type").Value;
+                    var paramName = paramAnnotation.Values.First(v => v.Key == "name").Value;
+                    var param = $"{paramType} {paramName}";
+                    if (!method.Parameters.Contains(param))
+                    {
+                        method.Parameters.Add(param);
+                    }
+                }
+            }
+
+            method.Id = annotation.Values.GetValue("id");
+            method.Code.AddRange(block.Code);
+
+            if (!annotation.Values.Any(v => v.Key == "enumerableStart" || v.Key == "enumerableEnd"))
+            {
+                var paramValues = block.Annotations.Skip(1)
+                    .Where(a => a.Name == "parameter")
+                    .Select(a => a.Values.First(v => v.Key == "value").Value);
+
+                var instanceName = char.ToLower(currentClass.ClassName[0]) + currentClass.ClassName.Substring(1);
+                _mainMethodLines.Add($"{instanceName}.{functionName}({string.Join(", ", paramValues)});");
+            }
+        }
+
+        protected override void ProcessMore(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            var annotation = block.Annotations[0];
+            var id = annotation.Values.First(v => v.Key == "id").Value;
+            var method = currentClass.Methods.FirstOrDefault(m => m.Id == id);
+            int insertIndex = -1;
+
+            if (method == null)
+            {
+                method = currentClass.Methods.FirstOrDefault(x => x.IndexById.ContainsKey(id));
+                if (method != null)
+                {
+                    insertIndex = method.IndexById[id];
+                }
+            }
+            else
+            {
+                insertIndex = method.Code.Count;
+            }
+
+            if (method != null && insertIndex != -1)
+            {
+                if (block.Annotations.Any(a => a.Name == "condition"))
+                {
+                    var conditionAnnotation = block.Annotations.First(x => x.Name == "condition");
+                    var expression = conditionAnnotation.Values.First(v => v.Key == "expression").Value;
+                    var conditionId = conditionAnnotation.Values.GetValue("id");
+
+                    List<string> cblock = new List<string>();
+                    cblock.Add($"if ({expression})");
+                    cblock.Add("{");
+                    cblock.AddRange(block.Code.Select(line => $"\t{line}"));
+                    cblock.Add("}");
+
+                    // Calculate how many lines we're about to insert
+                    int insertedLines = cblock.Count;
+
+                    // Adjust all subsequent indexes
+                    foreach (var kvp in method.IndexById.ToList())
+                    {
+                        if (kvp.Value >= insertIndex)
+                        {
+                            method.IndexById[kvp.Key] += insertedLines;
+                        }
+                    }
+
+                    method.Code.InsertRange(insertIndex, cblock);
+
+                    if (!string.IsNullOrEmpty(conditionId))
+                    {
+                        method.IndexById[conditionId] = insertIndex + insertedLines - 1;
+                    }
+                }
+                else
+                {
+                    // Adjust indexes for non-conditional inserts too
+                    int insertedLines = block.Code.Count;
+                    foreach (var kvp in method.IndexById.ToList())
+                    {
+                        if (kvp.Value >= insertIndex)
+                        {
+                            method.IndexById[kvp.Key] += insertedLines;
+                        }
+                    }
+
+                    method.Code.InsertRange(insertIndex, block.Code);
+                }
+            }
+        }
+
+        protected override void ProcessAssert(TranspiledClass currentClass, AnnotatedCode block)
         {
             var condition = block.Annotations[0].Values.First(v => v.Key == "condition").Value;
             var message = block.Code[0].Trim('"');
             string assertLine = _config.TestFramework.ToLower() switch
             {
                 "nunit" => $"Assert.That({condition}, \"{message}\");",
-                _ => $"Assert.True({condition}, \"{message}\");" // xunit default
+                _ => $"Assert.True({condition}, \"{message}\");"
             };
             currentClass.Assertions.Add(assertLine);
         }
