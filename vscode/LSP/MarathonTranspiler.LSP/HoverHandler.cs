@@ -1,8 +1,10 @@
 ﻿using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace MarathonTranspiler.LSP
 {
@@ -10,51 +12,122 @@ namespace MarathonTranspiler.LSP
     {
         private readonly Workspace _workspace;
 
+        private static readonly Dictionary<string, string> AnnotationDocumentation = new()
+        {
+            { "@varInit", "Initializes a variable with the specified class and type.\n\n**Required properties:**\n- `className`: The class where this variable is defined\n- `type`: The data type of the variable" },
+            { "@run", "Executes code within the context of a specific class and function.\n\n**Required properties:**\n- `id`: Unique identifier for this execution block\n- `className`: The class where this function is defined\n- `functionName`: The function to execute" },
+            { "@more", "Adds additional code to an existing execution block.\n\n**Required properties:**\n- `id`: The identifier of the execution block to extend" },
+            { "@condition", "Defines a conditional expression.\n\n**Required properties:**\n- `expression`: The boolean expression to evaluate" }
+        };
+
+        private static readonly Dictionary<string, Dictionary<string, string>> PropertyDocumentation = new()
+        {
+            { "@varInit", new Dictionary<string, string>
+                {
+                    { "className", "The class where this variable is defined" },
+                    { "type", "The data type of the variable (e.g., string, int, bool)" }
+                }
+            },
+            { "@run", new Dictionary<string, string>
+                {
+                    { "id", "Unique identifier for this execution block" },
+                    { "className", "The class where this function is defined" },
+                    { "functionName", "The function to execute" }
+                }
+            },
+            { "@more", new Dictionary<string, string>
+                {
+                    { "id", "The identifier of the execution block to extend" }
+                }
+            },
+            { "@condition", new Dictionary<string, string>
+                {
+                    { "expression", "The boolean expression to evaluate" }
+                }
+            }
+        };
+
         public HoverHandler(Workspace workspace)
         {
             _workspace = workspace;
         }
 
-        // 🔹 Annotation documentation dictionary
-        private static readonly Dictionary<string, string> AnnotationDocs = new()
+        public override Task<Hover> Handle(HoverParams request, CancellationToken cancellationToken)
         {
-            { "@varInit", "**@varInit** - Initializes a variable.\n\nParameters:\n- `className` → The class the variable belongs to.\n- `type` → The type of the variable.\n\nExample:\n```mrt\n@varInit(className=\"Parser\", type=\"string\")\nthis.Text = \"\";\n```" },
-            { "@run", "**@run** - Executes a function in the specified class.\n\nParameters:\n- `id` → A unique identifier for the execution.\n- `className` → The class containing the function.\n- `functionName` → The function to execute.\n\nExample:\n```mrt\n@run(id=\"parse\", className=\"Parser\", functionName=\"Parse\")\n```" },
-            { "@more", "**@more** - Adds more logic dynamically.\n\nParameters:\n- `id` → The identifier to attach additional logic to.\n\nExample:\n```mrt\n@more(id=\"parseLoop\")\n```" },
-            { "@condition", "**@condition** - Defines a conditional execution block.\n\nParameters:\n- `expression` → The condition to check.\n\nExample:\n```mrt\n@condition(expression=\"this.Position < this.Text.Length\")\n```" }
-        };
+            var uri = request.TextDocument.Uri;
+            var position = request.Position;
+            var lines = _workspace.GetDocumentLines(uri);
 
-        public override Task<Hover?> Handle(HoverParams request, CancellationToken cancellationToken)
-        {
-            var hoveredWord = ExtractHoveredWord(request);
-            if (hoveredWord == null || !AnnotationDocs.ContainsKey(hoveredWord))
-            {
-                return Task.FromResult<Hover?>(null); // No documentation found
-            }
+            if (lines == null || position.Line >= lines.Length)
+                return Task.FromResult<Hover>(null);
 
-            return Task.FromResult(new Hover
+            var line = lines[position.Line];
+
+            // Check if hovering over an annotation
+            if (line.TrimStart().StartsWith("@"))
             {
-                Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                var match = Regex.Match(line, @"^(\s*)(@\w+)(\(.*\))?$");
+                if (match.Success)
                 {
-                    Kind = MarkupKind.Markdown,
-                    Value = AnnotationDocs[hoveredWord]
-                })
-            });
-        }
+                    var annotation = match.Groups[2].Value;
+                    var indentLength = match.Groups[1].Value.Length;
 
-        private string? ExtractHoveredWord(HoverParams request)
-        {
-            var lines = _workspace.GetDocumentLines(request.TextDocument.Uri);
-            if (lines == null || request.Position.Line >= lines.Length)
-            {
-                return null;
+                    // If cursor is within the annotation keyword
+                    if (position.Character >= indentLength && position.Character < indentLength + annotation.Length)
+                    {
+                        if (AnnotationDocumentation.TryGetValue(annotation, out var documentation))
+                        {
+                            return Task.FromResult(new Hover
+                            {
+                                Contents = new MarkedStringsOrMarkupContent(
+                                    new MarkupContent
+                                    {
+                                        Kind = MarkupKind.Markdown,
+                                        Value = $"# {annotation}\n\n{documentation}"
+                                    }),
+                                Range = new Range(
+                                    new Position(position.Line, indentLength),
+                                    new Position(position.Line, indentLength + annotation.Length))
+                            });
+                        }
+                    }
+
+                    // Check if hovering over a property
+                    if (match.Groups[3].Success)
+                    {
+                        var propertiesText = match.Groups[3].Value;
+                        var propertyMatches = Regex.Matches(propertiesText, @"(\w+)=(""[^""]*""|[^,\)]+)");
+
+                        foreach (Match propertyMatch in propertyMatches)
+                        {
+                            var propertyName = propertyMatch.Groups[1].Value;
+                            var startPos = line.IndexOf(propertyName, indentLength + annotation.Length);
+
+                            if (position.Character >= startPos && position.Character < startPos + propertyName.Length)
+                            {
+                                if (PropertyDocumentation.TryGetValue(annotation, out var propertyDocs) &&
+                                    propertyDocs.TryGetValue(propertyName, out var propertyDoc))
+                                {
+                                    return Task.FromResult(new Hover
+                                    {
+                                        Contents = new MarkedStringsOrMarkupContent(
+                                            new MarkupContent
+                                            {
+                                                Kind = MarkupKind.Markdown,
+                                                Value = $"## {propertyName}\n\n{propertyDoc}"
+                                            }),
+                                        Range = new Range(
+                                            new Position(position.Line, startPos),
+                                            new Position(position.Line, startPos + propertyName.Length))
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
-            var line = lines[request.Position.Line];
-            var words = line.Split(' '); // Simplified: Should handle special cases
-
-            // Find the annotation the user is hovering over
-            return words.FirstOrDefault(word => word.StartsWith("@"));
+            return Task.FromResult<Hover>(null);
         }
 
         protected override HoverRegistrationOptions CreateRegistrationOptions(HoverCapability capability, ClientCapabilities clientCapabilities)

@@ -9,112 +9,265 @@ namespace MarathonTranspiler.LSP
 {
     public class CompletionHandler : CompletionHandlerBase
     {
-        // 🔹 Annotation keyword suggestions
-        private static readonly CompletionList AnnotationCompletions = new(
-            new List<CompletionItem>
-            {
-                new CompletionItem { Label = "@varInit", Kind = CompletionItemKind.Keyword, InsertText = "@varInit(" },
-                new CompletionItem { Label = "@run", Kind = CompletionItemKind.Keyword, InsertText = "@run(" },
-                new CompletionItem { Label = "@more", Kind = CompletionItemKind.Keyword, InsertText = "@more(" },
-                new CompletionItem { Label = "@condition", Kind = CompletionItemKind.Keyword, InsertText = "@condition(" }
-            });
+        private readonly Workspace _workspace;
 
-        // 🔹 Parameter suggestions for each annotation
-        private static readonly Dictionary<string, List<CompletionItem>> AnnotationParameters = new()
+        private static readonly List<CompletionItem> StandardSnippets = new()
         {
-            { "@varInit", new List<CompletionItem>
+            new CompletionItem
+            {
+                Label = "@varInit",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                // Remove @ from InsertText to prevent duplication
+                InsertText = "varInit(className=\"${1:ClassName}\", type=\"${2:string}\")\nthis.${3:Variable} = ${4:Value};",
+                Documentation = new MarkupContent
                 {
-                    new CompletionItem { Label = "className", Kind = CompletionItemKind.Property, InsertText = "className=\"" },
-                    new CompletionItem { Label = "type", Kind = CompletionItemKind.Property, InsertText = "type=\"" }
+                    Kind = MarkupKind.Markdown,
+                    Value = "Initialize a variable with class name and type."
                 }
             },
-            { "@run", new List<CompletionItem>
+            new CompletionItem
+            {
+                Label = "@run",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                // Remove @ from InsertText to prevent duplication
+                InsertText = "run(id=\"${1:runId}\", className=\"${2:ClassName}\", functionName=\"${3:functionName}\")\n${4:// Code to execute}",
+                Documentation = new MarkupContent
                 {
-                    new CompletionItem { Label = "id", Kind = CompletionItemKind.Property, InsertText = "id=\"" },
-                    new CompletionItem { Label = "className", Kind = CompletionItemKind.Property, InsertText = "className=\"" },
-                    new CompletionItem { Label = "functionName", Kind = CompletionItemKind.Property, InsertText = "functionName=\"" }
+                    Kind = MarkupKind.Markdown,
+                    Value = "Define an execution block with a unique ID."
                 }
             },
-            { "@more", new List<CompletionItem>
+            new CompletionItem
+            {
+                Label = "@condition",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                // Remove @ from InsertText to prevent duplication
+                InsertText = "condition(expression=\"${1:this.Position < this.Text.Length}\")",
+                Documentation = new MarkupContent
                 {
-                    new CompletionItem { Label = "id", Kind = CompletionItemKind.Property, InsertText = "id=\"" }
-                }
-            },
-            { "@condition", new List<CompletionItem>
-                {
-                    new CompletionItem { Label = "expression", Kind = CompletionItemKind.Property, InsertText = "expression=\"" }
+                    Kind = MarkupKind.Markdown,
+                    Value = "Add a conditional expression."
                 }
             }
         };
 
-        // 🔹 Value suggestions for certain parameters
-        private static readonly Dictionary<string, List<CompletionItem>> ParameterValueSuggestions = new()
+        // Parameter snippets remain unchanged
+        private static readonly Dictionary<string, List<CompletionItem>> ParameterSnippets = new()
         {
+            { "className", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "className",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "className=\"${1:ClassName}\""
+                    }
+                }
+            },
             { "type", new List<CompletionItem>
                 {
-                    new CompletionItem { Label = "string", Kind = CompletionItemKind.Value, InsertText = "string\"" },
-                    new CompletionItem { Label = "int", Kind = CompletionItemKind.Value, InsertText = "int\"" },
-                    new CompletionItem { Label = "bool", Kind = CompletionItemKind.Value, InsertText = "bool\"" }
+                    new CompletionItem {
+                        Label = "type",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "type=\"${1|string,int,bool,double,object|}\""
+                    }
+                }
+            },
+            { "id", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "id",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "id=\"${1:uniqueId}\""
+                    }
                 }
             },
             { "functionName", new List<CompletionItem>
                 {
-                    new CompletionItem { Label = "Parse", Kind = CompletionItemKind.Function, InsertText = "Parse\"" },
-                    new CompletionItem { Label = "Execute", Kind = CompletionItemKind.Function, InsertText = "Execute\"" }
+                    new CompletionItem {
+                        Label = "functionName",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "functionName=\"${1:functionName}\""
+                    }
+                }
+            },
+            { "expression", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "expression",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "expression=\"${1:condition}\""
+                    }
                 }
             }
         };
 
+        public CompletionHandler(Workspace workspace)
+        {
+            _workspace = workspace;
+        }
+
         public override Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
         {
-            var text = request.TextDocument.Uri.ToString();  // Get document URI
-            var position = request.Position;  // Get cursor position
+            var uri = request.TextDocument.Uri;
+            var position = request.Position;
 
-            // 🔹 If user is typing `@`, suggest annotations
-            if (position.Character == 0 || text[position.Character - 1] == '@')
+            // Get the document text and lines
+            var lines = _workspace.GetDocumentLines(uri);
+            if (lines == null || position.Line >= lines.Length)
+                return Task.FromResult(new CompletionList());
+
+            var line = lines[position.Line];
+            if (string.IsNullOrEmpty(line) || position.Character > line.Length)
+                return Task.FromResult(new CompletionList());
+
+            var linePrefix = position.Character > 0 ? line.Substring(0, position.Character) : string.Empty;
+
+            // If at start of line or after @, suggest annotation snippets
+            if (position.Character == 0 ||
+               (position.Character > 0 && linePrefix.EndsWith("@")))
             {
-                return Task.FromResult(AnnotationCompletions);
+                return Task.FromResult(new CompletionList(GetContextualSnippets(lines)));
             }
 
-            // 🔹 If inside an annotation (e.g., `@varInit(`), suggest parameters
-            var lineText = text[..position.Character]; // Get text up to the cursor
-            var annotation = AnnotationParameters.Keys.FirstOrDefault(a => lineText.Contains(a));
-
-            if (annotation != null && lineText.EndsWith("("))
+            // If inside parameter list, suggest parameter snippets
+            if (linePrefix.Contains("(") && !linePrefix.Contains(")"))
             {
-                return Task.FromResult(new CompletionList(AnnotationParameters[annotation]));
-            }
+                var parameterList = new List<CompletionItem>();
 
-            // 🔹 If typing after `=`, suggest values for known parameters
-            var lastWord = lineText.Split(' ').Last();
-            if (lastWord.Contains("="))
-            {
-                var parameterName = lastWord.Split('=').First();
-                if (ParameterValueSuggestions.ContainsKey(parameterName))
+                // Find which annotation we're in
+                var annotationPrefix = linePrefix.Substring(0, linePrefix.LastIndexOf('('));
+                var annotationType = annotationPrefix.TrimStart().Split(' ').Last().Trim();
+
+                // Get existing parameters to avoid suggesting duplicates
+                var existingParams = new HashSet<string>();
+                var paramSection = linePrefix.Substring(linePrefix.LastIndexOf('(') + 1);
+                var paramMatches = System.Text.RegularExpressions.Regex.Matches(paramSection, @"(\w+)=");
+                foreach (System.Text.RegularExpressions.Match match in paramMatches)
                 {
-                    return Task.FromResult(new CompletionList(ParameterValueSuggestions[parameterName]));
+                    existingParams.Add(match.Groups[1].Value);
                 }
+
+                // Add parameter snippets based on the annotation type
+                if (annotationType == "@varInit")
+                {
+                    if (!existingParams.Contains("className"))
+                        parameterList.AddRange(ParameterSnippets["className"]);
+                    if (!existingParams.Contains("type"))
+                        parameterList.AddRange(ParameterSnippets["type"]);
+                }
+                else if (annotationType == "@run")
+                {
+                    if (!existingParams.Contains("id"))
+                        parameterList.AddRange(ParameterSnippets["id"]);
+                    if (!existingParams.Contains("className"))
+                        parameterList.AddRange(ParameterSnippets["className"]);
+                    if (!existingParams.Contains("functionName"))
+                        parameterList.AddRange(ParameterSnippets["functionName"]);
+                }
+                else if (annotationType == "@more")
+                {
+                    if (!existingParams.Contains("id"))
+                    {
+                        // Collect existing ids from @run blocks to suggest them
+                        var existingIds = CollectExistingIds(lines);
+                        if (existingIds.Any())
+                        {
+                            parameterList.Add(new CompletionItem
+                            {
+                                Label = "id",
+                                Kind = CompletionItemKind.Property,
+                                InsertTextFormat = InsertTextFormat.Snippet,
+                                InsertText = $"id=\"${{1|{string.Join(",", existingIds)}|}}\""
+                            });
+                        }
+                        else
+                        {
+                            parameterList.AddRange(ParameterSnippets["id"]);
+                        }
+                    }
+                }
+                else if (annotationType == "@condition")
+                {
+                    if (!existingParams.Contains("expression"))
+                        parameterList.AddRange(ParameterSnippets["expression"]);
+                }
+
+                return Task.FromResult(new CompletionList(parameterList));
             }
 
             return Task.FromResult(new CompletionList());
         }
 
-        public override Task<CompletionItem> Handle(CompletionItem request, CancellationToken cancellationToken)
+        private List<string> CollectExistingIds(string[] lines)
         {
-            return Task.FromResult(request);
+            var ids = new List<string>();
+            foreach (var line in lines)
+            {
+                if (line.TrimStart().StartsWith("@run"))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(line, @"id=""([^""]+)""");
+                    if (match.Success)
+                    {
+                        ids.Add(match.Groups[1].Value);
+                    }
+                }
+            }
+            return ids;
+        }
+
+        private List<CompletionItem> GetContextualSnippets(string[] lines)
+        {
+            var snippets = new List<CompletionItem>(StandardSnippets);
+
+            // Add @more snippet if there are @run blocks with IDs
+            var existingIds = CollectExistingIds(lines);
+            if (existingIds.Any())
+            {
+                snippets.Add(new CompletionItem
+                {
+                    Label = "@more",
+                    Kind = CompletionItemKind.Snippet,
+                    InsertTextFormat = InsertTextFormat.Snippet,
+                    // Remove @ from InsertText to prevent duplication
+                    InsertText = $"more(id=\"${{1|{string.Join(",", existingIds)}|}}\")\n${{2:// Additional logic}}",
+                    Documentation = new MarkupContent
+                    {
+                        Kind = MarkupKind.Markdown,
+                        Value = "Add code to an existing execution block."
+                    }
+                });
+            }
+
+            return snippets;
         }
 
         protected override CompletionRegistrationOptions CreateRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)
         {
             return new CompletionRegistrationOptions
             {
-                TriggerCharacters = new Container<string>(new[] { "@", "(", "=" }), // Trigger on `@`, `(`, `=`
                 DocumentSelector = new TextDocumentSelector(new TextDocumentFilter
                 {
                     Pattern = "**/*.mrt",
                     Language = "mrt"
-                })
+                }),
+                TriggerCharacters = new Container<string>(new[] { "@", "(", ",", " " }),
+                ResolveProvider = true
             };
+        }
+
+        public override Task<CompletionItem> Handle(CompletionItem request, CancellationToken cancellationToken)
+        {
+            // This method is called when a completion item is selected
+            // You can use it to add more information to the selected item
+            return Task.FromResult(request);
         }
     }
 }
