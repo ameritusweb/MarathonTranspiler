@@ -1,0 +1,57 @@
+{
+  "name": "marathon-ext",
+  "displayName": "marathon-ext",
+  "description": "A runtime-first software development framework",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.97.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./out/extension",
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "mrt",
+        "aliases": [
+          "MRT Language",
+          "Marathon Language"
+        ],
+        "extensions": [
+          ".mrt"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mrt",
+        "scopeName": "source.mrt",
+        "path": "./syntaxes/mrt.tmLanguage.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "Marathon",
+        "uiTheme": "vs-dark",
+        "path": "./themes/marathon-theme.json"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/vscode": "^1.97.0",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "vscode": "^1.1.37",
+    "vscode-languageclient": "^9.0.1"
+  }
+}

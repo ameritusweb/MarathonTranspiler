@@ -1,0 +1,118 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "mrt",
+	"patterns": [
+	  {
+		"include": "#annotations"
+	  },
+	  {
+		"include": "#strings"
+	  },
+	  {
+		"include": "#comments"
+	  },
+	  {
+		"include": "#javascript"
+	  }
+	],
+	"repository": {
+	  "annotations": {
+		"patterns": [
+		  {
+			"name": "keyword.control.annotation.mrt",
+			"match": "(@varInit|@run|@more|@condition)\\b",
+			"captures": {
+			  "0": {
+				"name": "keyword.control.annotation.mrt"
+			  }
+			}
+		  },
+		  {
+			"name": "meta.annotation.mrt",
+			"begin": "(@\\w+)\\s*(\\()",
+			"beginCaptures": {
+			  "1": {
+				"name": "keyword.control.annotation.mrt"
+			  },
+			  "2": {
+				"name": "punctuation.section.parens.begin.mrt"
+			  }
+			},
+			"end": "\\)",
+			"endCaptures": {
+			  "0": {
+				"name": "punctuation.section.parens.end.mrt"
+			  }
+			},
+			"patterns": [
+			  {
+				"name": "entity.name.tag.property.mrt",
+				"match": "\\b(className|type|id|functionName|expression)\\b",
+				"captures": {
+				  "0": {
+					"name": "entity.other.attribute-name.mrt"
+				  }
+				}
+			  },
+			  {
+				"name": "keyword.operator.assignment.mrt",
+				"match": "="
+			  },
+			  {
+				"include": "#strings"
+			  }
+			]
+		  }
+		]
+	  },
+	  "strings": {
+		"name": "string.quoted.double.mrt",
+		"begin": "\"",
+		"end": "\"",
+		"patterns": [
+		  {
+			"name": "constant.character.escape.mrt",
+			"match": "\\\\."
+		  }
+		]
+	  },
+	  "comments": {
+		"patterns": [
+		  {
+			"name": "comment.line.double-slash.mrt",
+			"match": "//.*$"
+		  },
+		  {
+			"name": "comment.block.mrt",
+			"begin": "/\\*",
+			"end": "\\*/"
+		  }
+		]
+	  },
+	  "javascript": {
+		"patterns": [
+		  {
+			"match": "\\b(this|var|let|const|function|return|if|else|for|while|switch|case|break|continue|try|catch|finally)\\b",
+			"name": "keyword.control.js"
+		  },
+		  {
+			"match": "\\b(true|false|null|undefined)\\b",
+			"name": "constant.language.js"
+		  },
+		  {
+			"match": "\\b([0-9]+(\\.([0-9]+))?|\\.[0-9]+)\\b",
+			"name": "constant.numeric.js"
+		  },
+		  {
+			"match": "\\b(\\w+)(?=\\s*\\()",
+			"name": "entity.name.function.js"
+		  },
+		  {
+			"match": "\\b(\\w+)(?=\\.)",
+			"name": "variable.other.object.js"
+		  }
+		]
+	  }
+	},
+	"scopeName": "source.mrt"
+  }
