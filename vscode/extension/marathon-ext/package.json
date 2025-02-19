@@ -117,12 +117,6 @@
         "configuration": "./language-configuration.json"
       }
     ],
-    "semanticTokenProviders": [
-      {
-        "id": "mrt-semantic",
-        "language": "mrt"
-      }
-    ],
     "grammars": [
       {
         "language": "mrt",
