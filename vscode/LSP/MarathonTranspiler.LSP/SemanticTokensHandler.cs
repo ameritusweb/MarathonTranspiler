@@ -43,7 +43,9 @@ namespace MarathonTranspiler.LSP
 
         protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities)
         {
-            return new SemanticTokensRegistrationOptions
+            // this._workspace.SendNotification("Registering...");
+
+            var options = new SemanticTokensRegistrationOptions
             {
                 DocumentSelector = new TextDocumentSelector(new TextDocumentFilter
                 {
@@ -53,14 +55,32 @@ namespace MarathonTranspiler.LSP
                 Legend = this._legend,
                 Full = new SemanticTokensCapabilityRequestFull
                 {
-                    Delta = true
+                    Delta = false
                 },
                 Range = true
             };
+
+            return options;
+        }
+
+        public override Task<SemanticTokensFullOrDelta?> Handle(SemanticTokensDeltaParams request, CancellationToken cancellationToken)
+        {
+            return base.Handle(request, cancellationToken);
+        }
+
+        public override Task<SemanticTokens?> Handle(SemanticTokensParams request, CancellationToken cancellationToken)
+        {
+            return base.Handle(request, cancellationToken);
+        }
+
+        public override Task<SemanticTokens?> Handle(SemanticTokensRangeParams request, CancellationToken cancellationToken)
+        {
+            return base.Handle(request, cancellationToken);
         }
 
         protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(ITextDocumentIdentifierParams @params, CancellationToken cancellationToken)
         {
+            // this._workspace.SendNotification("Get Document....");
             return Task.FromResult(new SemanticTokensDocument(this._legend));
         }
 

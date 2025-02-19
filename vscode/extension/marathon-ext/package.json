@@ -17,6 +17,93 @@
     "test": "node ./out/test/runTest.js"
   },
   "contributes": {
+    "semanticTokenScopes": [
+    {
+      "language": "mrt",
+      "scopes": {
+        "keyword": [
+          "keyword.control.annotation.mrt",
+          "keyword.control.js"
+        ],
+        "function": [
+          "entity.name.function.js"
+        ],
+        "class": [
+          "entity.name.class"
+        ],
+        "variable": [
+          "variable.other.object.js",
+          "variable.other.readwrite"
+        ],
+        "comment": [
+          "comment.line.double-slash.mrt",
+          "comment.block.mrt"
+        ],
+        "string": [
+          "string.quoted.double.mrt"
+        ],
+        "number": [
+          "constant.numeric.js"
+        ]
+      }
+    }
+  ],
+    "semanticTokenTypes": [
+    {
+      "id": "keyword", 
+      "superType": "keyword",
+      "description": "Language keywords"
+    },
+    {
+      "id": "function",
+      "superType": "function", 
+      "description": "Function and method declarations"
+    },
+    {
+      "id": "variable",
+      "superType": "variable",
+      "description": "Variables and fields"
+    },
+    {
+      "id": "string",
+      "superType": "string",
+      "description": "String literals"
+    },
+    {
+      "id": "comment",
+      "superType": "comment",
+      "description": "Comments"
+    },
+    {
+      "id": "class",
+      "superType": "class",
+      "description": "Class, interface and enum declarations"
+    },
+    {
+      "id": "number",
+      "superType": "number",
+      "description": "Numeric literals"
+    },
+    {
+      "id": "parameter",
+      "superType": "parameter",
+      "description": "Function parameters"
+    }
+  ],
+  "semanticTokenModifiers": [
+    {
+      "id": "declaration",
+      "description": "Declarations"
+    },
+    {
+      "id": "definition",
+      "description": "Definitions"
+    },
+    {
+      "id": "readonly",
+      "description": "Read-only elements"
+    }
+  ],
     "languages": [
       {
         "id": "mrt",
@@ -30,18 +117,17 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "semanticTokenProviders": [
+      {
+        "id": "mrt-semantic",
+        "language": "mrt"
+      }
+    ],
     "grammars": [
       {
         "language": "mrt",
         "scopeName": "source.mrt",
         "path": "./syntaxes/mrt.tmLanguage.json"
-      }
-    ],
-    "themes": [
-      {
-        "label": "Marathon",
-        "uiTheme": "vs-dark",
-        "path": "./themes/marathon-theme.json"
       }
     ]
   },

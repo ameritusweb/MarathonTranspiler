@@ -1,5 +1,8 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using ColorCode.Compilation.Languages;
+using Microsoft.Extensions.DependencyInjection;
 using OmniSharp.Extensions.LanguageServer.Server;
+using System.Diagnostics;
+using System.Text;
 
 namespace MarathonTranspiler.LSP
 {
@@ -8,6 +11,11 @@ namespace MarathonTranspiler.LSP
         static async Task Main(string[] args)
         {
             var workspace = new Workspace();
+
+            // while (!Debugger.IsAttached)
+            // {
+            //    await Task.Delay(100); // Keep waiting until debugger is attached
+            // }
 
             var server = await LanguageServer.From(options =>
                 options.WithInput(Console.OpenStandardInput())
@@ -18,6 +26,7 @@ namespace MarathonTranspiler.LSP
                        .WithHandler<HoverHandler>()
                        .WithHandler<DefinitionHandler>()
                        .WithHandler<RenameHandler>()
+                       .WithHandler<SemanticTokensHandler>()
                     .OnInitialize(async (server, request, token) =>
                     {
                         workspace.Initialize(server, request.RootPath);
