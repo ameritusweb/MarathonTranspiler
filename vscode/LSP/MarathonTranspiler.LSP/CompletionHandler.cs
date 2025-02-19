@@ -28,6 +28,19 @@ namespace MarathonTranspiler.LSP
             },
             new CompletionItem
             {
+                Label = "@domInit",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                // Remove @ from InsertText to prevent duplication
+                InsertText = "domInit(id=\"${1:Id}\", parent=\"${2:Parent}\")\n<${3:Tag}>",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Initialize a DOM element with an ID and parent."
+                }
+            },
+            new CompletionItem
+            {
                 Label = "@run",
                 Kind = CompletionItemKind.Snippet,
                 InsertTextFormat = InsertTextFormat.Snippet,
@@ -37,6 +50,19 @@ namespace MarathonTranspiler.LSP
                 {
                     Kind = MarkupKind.Markdown,
                     Value = "Define an execution block with a unique ID."
+                }
+            },
+            new CompletionItem
+            {
+                Label = "@onEvent",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                // Remove @ from InsertText to prevent duplication
+                InsertText = "onEvent(event=\"${1:Event}\", target=\"${2:Target}\")\n${3:// Code to execute in response}",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Define an event handler."
                 }
             },
             new CompletionItem
@@ -123,6 +149,16 @@ namespace MarathonTranspiler.LSP
                     }
                 }
             },
+            { "parent", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "parent",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "parent=\"${1:parent}\""
+                    }
+                }
+            },
             { "functionName", new List<CompletionItem>
                 {
                     new CompletionItem {
@@ -140,6 +176,26 @@ namespace MarathonTranspiler.LSP
                         Kind = CompletionItemKind.Property,
                         InsertTextFormat = InsertTextFormat.Snippet,
                         InsertText = "expression=\"${1:condition}\""
+                    }
+                }
+            },
+            { "event", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "event",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "event=\"${1:Name}\""
+                    }
+                }
+            },
+            { "target", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "target",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "target=\"${1:Target}\""
                     }
                 }
             },
@@ -209,12 +265,26 @@ namespace MarathonTranspiler.LSP
                     if (!existingParams.Contains("type"))
                         parameterList.AddRange(ParameterSnippets["type"]);
                 }
+                else if (annotationType == "@domInit")
+                {
+                    if (!existingParams.Contains("id"))
+                        parameterList.AddRange(ParameterSnippets["id"]);
+                    if (!existingParams.Contains("parent"))
+                        parameterList.AddRange(ParameterSnippets["parent"]);
+                }
                 else if (annotationType == "@parameter")
                 {
                     if (!existingParams.Contains("name"))
                         parameterList.AddRange(ParameterSnippets["name"]);
                     if (!existingParams.Contains("type"))
                         parameterList.AddRange(ParameterSnippets["type"]);
+                }
+                else if (annotationType == "@onEvent")
+                {
+                    if (!existingParams.Contains("event"))
+                        parameterList.AddRange(ParameterSnippets["event"]);
+                    if (!existingParams.Contains("target"))
+                        parameterList.AddRange(ParameterSnippets["target"]);
                 }
                 else if (annotationType == "@run")
                 {

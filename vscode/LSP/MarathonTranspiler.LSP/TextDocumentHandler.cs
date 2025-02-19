@@ -17,7 +17,7 @@ namespace MarathonTranspiler.LSP
 
         private static readonly List<string> ValidAnnotations = new()
         {
-            "@varInit", "@run", "@more", "@condition", "@parameter", "@assert"
+            "@varInit", "@run", "@more", "@condition", "@parameter", "@assert", "@domInit", "@onEvent"
         };
 
         private static readonly Dictionary<string, List<string>> RequiredProperties = new()
@@ -28,6 +28,8 @@ namespace MarathonTranspiler.LSP
             { "@condition", new List<string> { "expression" } },
             { "@assert", new List<string> { "condition" } },
             { "@parameter", new List<string> { "name", "type" } },
+            { "@domInit", new List<string> { "id", "parent" } },
+            { "@onEvent", new List<string> { "event", "target" } },
         };
 
         public TextDocumentHandler(Workspace workspace)
