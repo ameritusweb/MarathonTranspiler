@@ -51,7 +51,33 @@ namespace MarathonTranspiler.LSP
                     Kind = MarkupKind.Markdown,
                     Value = "Add a conditional expression."
                 }
-            }
+            },
+            new CompletionItem
+            {
+                Label = "@assert",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                // Remove @ from InsertText to prevent duplication
+                InsertText = "assert(condition=\"${1:this.Position < this.Text.Length}\")",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Add an assert for a test case."
+                }
+            },
+            new CompletionItem
+            {
+                Label = "@parameter",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                // Remove @ from InsertText to prevent duplication
+                InsertText = "parameter(name=\"${1:Name}\", type=\"${2:string}\")",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Declare a parameter to the function."
+                }
+            },
         };
 
         // Parameter snippets remain unchanged
@@ -64,6 +90,16 @@ namespace MarathonTranspiler.LSP
                         Kind = CompletionItemKind.Property,
                         InsertTextFormat = InsertTextFormat.Snippet,
                         InsertText = "className=\"${1:ClassName}\""
+                    }
+                }
+            },
+            { "name", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "name",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "name=\"${1:Name}\""
                     }
                 }
             },
@@ -104,6 +140,16 @@ namespace MarathonTranspiler.LSP
                         Kind = CompletionItemKind.Property,
                         InsertTextFormat = InsertTextFormat.Snippet,
                         InsertText = "expression=\"${1:condition}\""
+                    }
+                }
+            },
+            { "condition", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "condition",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "condition=\"${1:expression}\""
                     }
                 }
             }
@@ -163,6 +209,13 @@ namespace MarathonTranspiler.LSP
                     if (!existingParams.Contains("type"))
                         parameterList.AddRange(ParameterSnippets["type"]);
                 }
+                else if (annotationType == "@parameter")
+                {
+                    if (!existingParams.Contains("name"))
+                        parameterList.AddRange(ParameterSnippets["name"]);
+                    if (!existingParams.Contains("type"))
+                        parameterList.AddRange(ParameterSnippets["type"]);
+                }
                 else if (annotationType == "@run")
                 {
                     if (!existingParams.Contains("id"))
@@ -198,6 +251,11 @@ namespace MarathonTranspiler.LSP
                 {
                     if (!existingParams.Contains("expression"))
                         parameterList.AddRange(ParameterSnippets["expression"]);
+                }
+                else if (annotationType == "@assert")
+                {
+                    if (!existingParams.Contains("condition"))
+                        parameterList.AddRange(ParameterSnippets["condition"]);
                 }
 
                 return Task.FromResult(new CompletionList(parameterList));
