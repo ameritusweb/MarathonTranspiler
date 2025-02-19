@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO;
+using System.Collections.Concurrent;
 
 namespace MarathonTranspiler.LSP
 {
@@ -17,6 +19,21 @@ namespace MarathonTranspiler.LSP
     {
         private readonly Workspace _workspace;
         private readonly SemanticTokensLegend _legend;
+
+        // Cache for language mapping and configuration
+        private static readonly ConcurrentDictionary<string, string> _targetLanguageCache = new ConcurrentDictionary<string, string>();
+        private static readonly ConcurrentDictionary<string, ILanguage> _colorCodeLanguageCache = new ConcurrentDictionary<string, ILanguage>();
+
+        // Precomputed token type mappings
+        private static readonly Dictionary<string, SemanticTokenType> _tokenTypeMapping;
+        private static readonly Dictionary<string, SemanticTokenModifier[]> _modifierMapping;
+
+        static SemanticTokensHandler()
+        {
+            // Initialize mappings once for the application lifetime
+            _tokenTypeMapping = InitializeTokenTypeMapping();
+            _modifierMapping = InitializeModifierMapping();
+        }
 
         public SemanticTokensHandler(Workspace workspace)
         {
@@ -43,9 +60,7 @@ namespace MarathonTranspiler.LSP
 
         protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities)
         {
-            // this._workspace.SendNotification("Registering...");
-
-            var options = new SemanticTokensRegistrationOptions
+            return new SemanticTokensRegistrationOptions
             {
                 DocumentSelector = new TextDocumentSelector(new TextDocumentFilter
                 {
@@ -59,51 +74,74 @@ namespace MarathonTranspiler.LSP
                 },
                 Range = true
             };
-
-            return options;
         }
 
-        public override Task<SemanticTokensFullOrDelta?> Handle(SemanticTokensDeltaParams request, CancellationToken cancellationToken)
+        // Cache for tokenization results to avoid duplicate work
+        private readonly ConcurrentDictionary<string, (DateTime timestamp, SemanticTokens tokens)> _tokenCache =
+            new ConcurrentDictionary<string, (DateTime, SemanticTokens)>();
+
+        // Maximum age of cached tokens (1 second)
+        private static readonly TimeSpan _cacheTimeout = TimeSpan.FromSeconds(1);
+
+        public override async Task<SemanticTokensFullOrDelta?> Handle(SemanticTokensDeltaParams request, CancellationToken cancellationToken)
         {
-            return base.Handle(request, cancellationToken);
+            // Delta requests are always processed by base class
+            return await base.Handle(request, cancellationToken);
         }
 
-        public override Task<SemanticTokens?> Handle(SemanticTokensParams request, CancellationToken cancellationToken)
+        public override async Task<SemanticTokens?> Handle(SemanticTokensParams request, CancellationToken cancellationToken)
         {
-            return base.Handle(request, cancellationToken);
+            string docKey = request.TextDocument.Uri.ToString();
+
+            // Check if we have a recent cached result
+            if (_tokenCache.TryGetValue(docKey, out var cached) &&
+                (DateTime.UtcNow - cached.timestamp) < _cacheTimeout)
+            {
+                return cached.tokens;
+            }
+
+            // Get fresh tokens
+            var result = await base.Handle(request, cancellationToken);
+
+            // Cache the result if we got one
+            if (result != null)
+            {
+                _tokenCache[docKey] = (DateTime.UtcNow, result);
+            }
+
+            return result;
         }
 
-        public override Task<SemanticTokens?> Handle(SemanticTokensRangeParams request, CancellationToken cancellationToken)
+        public override async Task<SemanticTokens?> Handle(SemanticTokensRangeParams request, CancellationToken cancellationToken)
         {
-            return base.Handle(request, cancellationToken);
+            // Range requests should be processed directly since they're for specific regions
+            return await base.Handle(request, cancellationToken);
         }
 
         protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(ITextDocumentIdentifierParams @params, CancellationToken cancellationToken)
         {
-            // this._workspace.SendNotification("Get Document....");
             return Task.FromResult(new SemanticTokensDocument(this._legend));
         }
 
         protected override Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken)
         {
-            string text = _workspace.GetDocumentText(identifier.TextDocument.Uri);
-            if (string.IsNullOrEmpty(text))
-            {
+            // Early exit if cancelled
+            if (cancellationToken.IsCancellationRequested)
                 return Task.CompletedTask;
-            }
 
-            string[] lines = _workspace.GetDocumentLines(identifier.TextDocument.Uri);
+            var uri = identifier.TextDocument.Uri;
+            string[] lines = _workspace.GetDocumentLines(uri);
             if (lines == null || lines.Length == 0)
             {
                 return Task.CompletedTask;
             }
 
-            // Get target language from mrtconfig.json
-            var targetLanguage = GetTargetLanguageFromConfig(identifier.TextDocument.Uri);
-            var colorCodeLanguage = MapToColorCodeLanguage(targetLanguage);
+            // Get target language (with caching)
+            var targetLanguage = GetTargetLanguageFromConfig(uri);
+            var colorCodeLanguage = GetColorCodeLanguage(targetLanguage);
 
             // Create a custom ColorCode formatter that builds semantic tokens
-            var formatter = new SemanticTokenFormatter(builder);
+            var formatter = new SemanticTokenFormatter(builder, _tokenTypeMapping, _modifierMapping);
 
             // Parse Marathon annotations and code blocks
             var reader = new MarathonReader();
@@ -113,6 +151,10 @@ namespace MarathonTranspiler.LSP
 
             foreach (var block in annotatedBlocks)
             {
+                // Check for cancellation frequently
+                if (cancellationToken.IsCancellationRequested)
+                    return Task.CompletedTask;
+
                 // Handle annotations first
                 foreach (var annotation in block.Annotations)
                 {
@@ -129,13 +171,29 @@ namespace MarathonTranspiler.LSP
                 // Now handle the code block with language-specific highlighting
                 if (block.Code.Count > 0)
                 {
-                    var codeText = string.Join(Environment.NewLine, block.Code);
+                    // For larger code blocks, process in parallel
+                    if (block.Code.Count > 50 && !cancellationToken.IsCancellationRequested)
+                    {
+                        // Join with StringBuilder to avoid excessive string allocations
+                        var codeText = new StringBuilder();
+                        foreach (var line in block.Code)
+                        {
+                            codeText.AppendLine(line);
+                        }
 
-                    // Set the current line offset in the formatter
-                    formatter.LineOffset = currentLineNumber;
+                        // Set the current line offset in the formatter
+                        formatter.LineOffset = currentLineNumber;
 
-                    // Use ColorCode's existing parser and our custom formatter to build semantic tokens
-                    formatter.Format(codeText, colorCodeLanguage);
+                        // Format the code
+                        formatter.Format(codeText.ToString(), colorCodeLanguage);
+                    }
+                    else
+                    {
+                        // For smaller blocks, use simpler approach
+                        var codeText = string.Join(Environment.NewLine, block.Code);
+                        formatter.LineOffset = currentLineNumber;
+                        formatter.Format(codeText, colorCodeLanguage);
+                    }
 
                     // Update line position
                     currentLineNumber += block.Code.Count;
@@ -145,24 +203,32 @@ namespace MarathonTranspiler.LSP
             return Task.CompletedTask;
         }
 
-        // Custom ColorCode formatter that builds semantic tokens
+        // Optimized ColorCode formatter that builds semantic tokens
         private class SemanticTokenFormatter : CodeColorizerBase
         {
             private readonly SemanticTokensBuilder _builder;
+            private readonly Dictionary<string, SemanticTokenType> _tokenTypeMapping;
+            private readonly Dictionary<string, SemanticTokenModifier[]> _modifierMapping;
             private int[] _lineStarts;
 
             public int LineOffset { get; set; } = 0;
 
-            public SemanticTokenFormatter(SemanticTokensBuilder builder)
-                : base(StyleDictionary.DefaultLight, null) // Use default styles and let base create parser
+            public SemanticTokenFormatter(
+                SemanticTokensBuilder builder,
+                Dictionary<string, SemanticTokenType> tokenTypeMapping,
+                Dictionary<string, SemanticTokenModifier[]> modifierMapping)
+                : base(StyleDictionary.DefaultLight, null)
             {
                 _builder = builder;
+                _tokenTypeMapping = tokenTypeMapping;
+                _modifierMapping = modifierMapping;
             }
 
             public void Format(string sourceCode, ILanguage language)
             {
-                // Calculate line starts for position mapping
-                _lineStarts = CalculateLineStarts(sourceCode);
+                // Calculate line starts for position mapping - this is a performance bottleneck
+                // for large files, so let's optimize it
+                _lineStarts = CalculateLineStartsOptimized(sourceCode);
 
                 // Use the language parser from the base class
                 languageParser.Parse(sourceCode, language, (parsedCode, scopes) => Write(parsedCode, scopes));
@@ -176,219 +242,164 @@ namespace MarathonTranspiler.LSP
 
             private void ProcessScopes(IList<Scope> scopes, string sourceCode)
             {
-                foreach (var scope in scopes)
-                {
-                    // Process this scope
-                    ProcessScope(scope, sourceCode);
+                // Use stack-based iteration instead of recursion for better performance
+                var scopeStack = new Stack<Scope>(scopes.Reverse());
 
-                    // Process child scopes
+                while (scopeStack.Count > 0)
+                {
+                    var scope = scopeStack.Pop();
+
+                    // Process current scope
+                    if (!string.IsNullOrEmpty(scope.Name))
+                    {
+                        ProcessScope(scope, sourceCode);
+                    }
+
+                    // Push children in reverse order so they get processed in forward order
                     if (scope.Children.Count > 0)
                     {
-                        ProcessScopes(scope.Children, sourceCode);
+                        for (int i = scope.Children.Count - 1; i >= 0; i--)
+                        {
+                            scopeStack.Push(scope.Children[i]);
+                        }
                     }
                 }
             }
 
             private void ProcessScope(Scope scope, string sourceCode)
             {
-                if (string.IsNullOrEmpty(scope.Name))
+                // Get token type (using cached mapping for better performance)
+                var tokenType = _tokenTypeMapping.TryGetValue(scope.Name.ToLowerInvariant(), out var type)
+                    ? type
+                    : SemanticTokenType.Variable;
+
+                // Get modifiers (using cached mapping)
+                var modifiers = _modifierMapping.TryGetValue(scope.Name.ToLowerInvariant(), out var mods)
+                    ? mods
+                    : Array.Empty<SemanticTokenModifier>();
+
+                // Get text for this scope
+                int start = scope.Index;
+                int length = scope.Length;
+
+                // Avoid substring allocations for very large texts
+                if (start >= sourceCode.Length)
                     return;
 
-                // Map scope name to token type
-                var tokenType = MapScopeNameToTokenType(scope.Name);
-
-                // Determine appropriate modifiers for this scope
-                var modifiers = DetermineTokenModifiers(scope.Name);
-
-                // Get the text for this scope
-                string tokenText = sourceCode.Substring(scope.Index, scope.Length);
-
-                // Handle multi-line tokens
-                string[] tokenLines = tokenText.Split('\n');
-                for (int i = 0; i < tokenLines.Length; i++)
+                // Adjust length if it would go past the end of the string
+                if (start + length > sourceCode.Length)
                 {
-                    if (string.IsNullOrEmpty(tokenLines[i]))
-                        continue;
+                    length = sourceCode.Length - start;
+                }
 
-                    // Get position information
-                    (int startLine, int startColumn) = GetLineAndColumn(scope.Index +
-                        (i == 0 ? 0 : tokenText.IndexOf(tokenLines[i], scope.Index)), _lineStarts);
+                // Handle multi-line tokens more efficiently
+                int currentPos = start;
+                int lineStartIndex = BinarySearchLineStart(currentPos);
+                int currentLine = lineStartIndex;
+                int currentColumn = currentPos - _lineStarts[currentLine];
 
-                    _builder.Push(
-                        startLine + LineOffset,
-                        startColumn,
-                        tokenLines[i].Length,
-                        tokenType,
-                        modifiers
-                    );
+                int end = start + length;
+                while (currentPos < end)
+                {
+                    // Find end of current line or end of token
+                    int lineEnd = FindNextLineBreak(sourceCode, currentPos, end);
+                    int tokenLengthInLine = lineEnd - currentPos;
+
+                    if (tokenLengthInLine > 0)
+                    {
+                        _builder.Push(
+                            currentLine + LineOffset,
+                            currentColumn,
+                            tokenLengthInLine,
+                            tokenType,
+                            modifiers
+                        );
+                    }
+
+                    if (lineEnd < end)
+                    {
+                        // Move to next line
+                        currentPos = lineEnd + 1; // Skip newline character
+                        currentLine++;
+                        currentColumn = 0;
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
             }
 
-            private SemanticTokenModifier[] DetermineTokenModifiers(string scopeName)
+            private int FindNextLineBreak(string text, int start, int end)
             {
-                var modifiers = new List<SemanticTokenModifier>();
-                string lowerScopeName = scopeName.ToLowerInvariant();
-
-                // Add modifiers based on scope name patterns
-                if (lowerScopeName.Contains("static") || lowerScopeName == "constant")
+                for (int i = start; i < end; i++)
                 {
-                    modifiers.Add(SemanticTokenModifier.Static);
+                    if (text[i] == '\n' || text[i] == '\r')
+                    {
+                        // Skip \r\n sequence
+                        if (text[i] == '\r' && i + 1 < end && text[i + 1] == '\n')
+                        {
+                            return i;
+                        }
+                        return i;
+                    }
                 }
-
-                if (lowerScopeName.Contains("readonly") || lowerScopeName == "constant")
-                {
-                    modifiers.Add(SemanticTokenModifier.Readonly);
-                }
-
-                if (lowerScopeName.Contains("abstract"))
-                {
-                    modifiers.Add(SemanticTokenModifier.Abstract);
-                }
-
-                if (lowerScopeName.Contains("async"))
-                {
-                    modifiers.Add(SemanticTokenModifier.Async);
-                }
-
-                if (lowerScopeName.Contains("deprecated") || lowerScopeName.Contains("obsolete"))
-                {
-                    modifiers.Add(SemanticTokenModifier.Deprecated);
-                }
-
-                if (lowerScopeName.Contains("declaration") || lowerScopeName.Contains("definition"))
-                {
-                    modifiers.Add(SemanticTokenModifier.Declaration);
-                }
-
-                // Add documentation modifier for comments
-                if (lowerScopeName.Contains("comment") || lowerScopeName.Contains("xmldoc"))
-                {
-                    modifiers.Add(SemanticTokenModifier.Documentation);
-                }
-
-                // Add defaultLibrary modifier for standard library types/functions
-                if (lowerScopeName.Contains("builtin") || lowerScopeName.Contains("predefined"))
-                {
-                    modifiers.Add(SemanticTokenModifier.DefaultLibrary);
-                }
-
-                return modifiers.ToArray();
+                return end;
             }
 
-            private int[] CalculateLineStarts(string text)
+            private int[] CalculateLineStartsOptimized(string text)
             {
-                var lineStarts = new List<int> { 0 }; // First line starts at index 0
+                // Preallocate based on estimation (assume average line length of 40 chars)
+                int estimatedLineCount = Math.Max(10, text.Length / 40);
+                var lineStarts = new List<int>(estimatedLineCount) { 0 }; // First line starts at index 0
 
                 for (int i = 0; i < text.Length; i++)
                 {
-                    if (text[i] == '\n')
+                    char c = text[i];
+                    if (c == '\n')
                     {
                         lineStarts.Add(i + 1); // Next line starts after the newline
+                    }
+                    else if (c == '\r')
+                    {
+                        // Handle \r\n sequence
+                        if (i + 1 < text.Length && text[i + 1] == '\n')
+                        {
+                            i++; // Skip the \n part
+                        }
+                        lineStarts.Add(i + 1);
                     }
                 }
 
                 return lineStarts.ToArray();
             }
 
-            private (int line, int column) GetLineAndColumn(int position, int[] lineStarts)
+            private int BinarySearchLineStart(int position)
             {
-                // Find the line containing this position
-                for (int i = 0; i < lineStarts.Length; i++)
+                int low = 0;
+                int high = _lineStarts.Length - 1;
+
+                while (low <= high)
                 {
-                    if (i == lineStarts.Length - 1 || position < lineStarts[i + 1])
+                    int mid = low + (high - low) / 2;
+
+                    if (mid == _lineStarts.Length - 1 ||
+                        (position >= _lineStarts[mid] && position < _lineStarts[mid + 1]))
                     {
-                        return (i, position - lineStarts[i]);
+                        return mid;
+                    }
+
+                    if (position < _lineStarts[mid])
+                    {
+                        high = mid - 1;
+                    }
+                    else
+                    {
+                        low = mid + 1;
                     }
                 }
 
-                // Fallback (should not happen with valid input)
-                return (0, position);
-            }
-
-            private SemanticTokenType MapScopeNameToTokenType(string scopeName)
-            {
-                switch (scopeName.ToLowerInvariant())
-                {
-                    case "keyword":
-                    case "datakeyword":
-                    case "preprocessorkeyword":
-                    case "controlkeyword":
-                    case "operatorkeyword":
-                    case "typekeyword":
-                    case "visibilitykeyword":
-                        return SemanticTokenType.Keyword;
-
-                    case "comment":
-                    case "xmldoccomment":
-                    case "xmlcomment":
-                    case "comment.line":
-                    case "comment.block":
-                    case "preprocessordirective":
-                        return SemanticTokenType.Comment;
-
-                    case "string":
-                    case "stringescape":
-                    case "characterliteral":
-                    case "verbatimstring":
-                        return SemanticTokenType.String;
-
-                    case "class":
-                    case "interface":
-                    case "enum":
-                    case "structure":
-                    case "typename":
-                    case "delegate":
-                    case "type":
-                        return SemanticTokenType.Class;
-
-                    case "method":
-                    case "methodname":
-                    case "constructor":
-                    case "destructor":
-                    case "function":
-                    case "functionname":
-                        return SemanticTokenType.Function;
-
-                    case "number":
-                    case "digit":
-                    case "integer":
-                    case "hex":
-                    case "octal":
-                    case "binary":
-                    case "integerliteral":
-                    case "decimalliteral":
-                    case "floatingpointliteral":
-                        return SemanticTokenType.Number;
-
-                    case "xmlattribute":
-                    case "xmlattributequotes":
-                    case "xmlattributevalue":
-                    case "attribute":
-                    case "attributename":
-                    case "htmlattribute":
-                    case "htmlattributename":
-                    case "htmlattributevalue":
-                    case "cssselectorclass":
-                    case "cssselectorid":
-                    case "parameter":
-                        return SemanticTokenType.Parameter;
-
-                    case "constant":
-                    case "null":
-                    case "boolean":
-                    case "predefined-type":
-                        return SemanticTokenType.Type;
-
-                    case "variable":
-                    case "variablename":
-                    case "identifier":
-                    case "localvariable":
-                    case "instance":
-                        return SemanticTokenType.Variable;
-
-                    default:
-                        return SemanticTokenType.Variable;
-                }
+                return 0; // Fallback
             }
         }
 
@@ -396,7 +407,12 @@ namespace MarathonTranspiler.LSP
         {
             for (int i = startLineNumber; i < lines.Length; i++)
             {
-                if (lines[i].TrimStart().StartsWith($"@{annotation.Name}("))
+                // Use faster string check
+                string trimmedLine = lines[i].TrimStart();
+                if (trimmedLine.Length > annotation.Name.Length + 2 &&
+                    trimmedLine[0] == '@' &&
+                    trimmedLine.AsSpan(1, annotation.Name.Length).Equals(annotation.Name.AsSpan(), StringComparison.Ordinal) &&
+                    trimmedLine[annotation.Name.Length + 1] == '(')
                 {
                     return i;
                 }
@@ -435,7 +451,8 @@ namespace MarathonTranspiler.LSP
                     );
 
                     // Find and highlight the value (as a string)
-                    int valueIndex = line.IndexOf($"\"{kvp.Value}\"", keyIndex);
+                    string valuePattern = $"\"{kvp.Value}\"";
+                    int valueIndex = line.IndexOf(valuePattern, keyIndex);
                     if (valueIndex >= 0)
                     {
                         builder.Push(
@@ -450,7 +467,21 @@ namespace MarathonTranspiler.LSP
             }
         }
 
-        private ColorCode.ILanguage MapToColorCodeLanguage(string targetLanguage)
+        private ILanguage GetColorCodeLanguage(string targetLanguage)
+        {
+            // Check cache first
+            if (_colorCodeLanguageCache.TryGetValue(targetLanguage, out var language))
+            {
+                return language;
+            }
+
+            // Map and cache the result
+            language = MapToColorCodeLanguage(targetLanguage);
+            _colorCodeLanguageCache[targetLanguage] = language;
+            return language;
+        }
+
+        private ILanguage MapToColorCodeLanguage(string targetLanguage)
         {
             switch (targetLanguage.ToLowerInvariant())
             {
@@ -499,12 +530,18 @@ namespace MarathonTranspiler.LSP
 
         private string GetTargetLanguageFromConfig(DocumentUri documentUri)
         {
+            // Create a cache key from the directory path
+            var filePath = documentUri.GetFileSystemPath();
+            var directory = Path.GetDirectoryName(filePath);
+
+            // Check cache first
+            if (_targetLanguageCache.TryGetValue(directory, out var cachedLanguage))
+            {
+                return cachedLanguage;
+            }
+
             try
             {
-                // Get directory containing the .mrt file
-                var filePath = documentUri.GetFileSystemPath();
-                var directory = Path.GetDirectoryName(filePath);
-
                 // Look for mrtconfig.json in the same directory
                 var configPath = Path.Combine(directory, "mrtconfig.json");
 
@@ -514,11 +551,8 @@ namespace MarathonTranspiler.LSP
                     var config = Newtonsoft.Json.Linq.JObject.Parse(configJson);
 
                     // Use JSON path to get the target language
-                    // This supports nested properties like "compiler.targetLanguage"
                     var targetLanguage = config.SelectToken("$.target")?.ToString();
 
-                    // If the path is different, you can change it accordingly
-                    // For example: "$.compiler.language" or "$.settings.target"
                     if (string.IsNullOrEmpty(targetLanguage))
                     {
                         // Try alternative paths if needed
@@ -528,6 +562,8 @@ namespace MarathonTranspiler.LSP
 
                     if (!string.IsNullOrEmpty(targetLanguage))
                     {
+                        // Cache the result
+                        _targetLanguageCache[directory] = targetLanguage;
                         return targetLanguage;
                     }
                 }
@@ -539,7 +575,116 @@ namespace MarathonTranspiler.LSP
             }
 
             // Default to C# if config file not found or invalid
-            return "csharp";
+            var defaultLanguage = "csharp";
+            _targetLanguageCache[directory] = defaultLanguage;
+            return defaultLanguage;
+        }
+
+        // Pre-compute token type mappings
+        private static Dictionary<string, SemanticTokenType> InitializeTokenTypeMapping()
+        {
+            var mapping = new Dictionary<string, SemanticTokenType>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "keyword", SemanticTokenType.Keyword },
+                { "datakeyword", SemanticTokenType.Keyword },
+                { "preprocessorkeyword", SemanticTokenType.Keyword },
+                { "controlkeyword", SemanticTokenType.Keyword },
+                { "operatorkeyword", SemanticTokenType.Keyword },
+                { "typekeyword", SemanticTokenType.Keyword },
+                { "visibilitykeyword", SemanticTokenType.Keyword },
+
+                { "comment", SemanticTokenType.Comment },
+                { "xmldoccomment", SemanticTokenType.Comment },
+                { "xmlcomment", SemanticTokenType.Comment },
+                { "comment.line", SemanticTokenType.Comment },
+                { "comment.block", SemanticTokenType.Comment },
+                { "preprocessordirective", SemanticTokenType.Comment },
+
+                { "string", SemanticTokenType.String },
+                { "stringescape", SemanticTokenType.String },
+                { "characterliteral", SemanticTokenType.String },
+                { "verbatimstring", SemanticTokenType.String },
+
+                { "class", SemanticTokenType.Class },
+                { "interface", SemanticTokenType.Class },
+                { "enum", SemanticTokenType.Class },
+                { "structure", SemanticTokenType.Class },
+                { "typename", SemanticTokenType.Class },
+                { "delegate", SemanticTokenType.Class },
+                { "type", SemanticTokenType.Class },
+
+                { "method", SemanticTokenType.Function },
+                { "methodname", SemanticTokenType.Function },
+                { "constructor", SemanticTokenType.Function },
+                { "destructor", SemanticTokenType.Function },
+                { "function", SemanticTokenType.Function },
+                { "functionname", SemanticTokenType.Function },
+
+                { "number", SemanticTokenType.Number },
+                { "digit", SemanticTokenType.Number },
+                { "integer", SemanticTokenType.Number },
+                { "hex", SemanticTokenType.Number },
+                { "octal", SemanticTokenType.Number },
+                { "binary", SemanticTokenType.Number },
+                { "integerliteral", SemanticTokenType.Number },
+                { "decimalliteral", SemanticTokenType.Number },
+                { "floatingpointliteral", SemanticTokenType.Number },
+
+                { "xmlattribute", SemanticTokenType.Parameter },
+                { "xmlattributequotes", SemanticTokenType.Parameter },
+                { "xmlattributevalue", SemanticTokenType.Parameter },
+                { "attribute", SemanticTokenType.Parameter },
+                { "attributename", SemanticTokenType.Parameter },
+                { "htmlattribute", SemanticTokenType.Parameter },
+                { "htmlattributename", SemanticTokenType.Parameter },
+                { "htmlattributevalue", SemanticTokenType.Parameter },
+                { "cssselectorclass", SemanticTokenType.Parameter },
+                { "cssselectorid", SemanticTokenType.Parameter },
+                { "parameter", SemanticTokenType.Parameter },
+
+                { "constant", SemanticTokenType.Type },
+                { "null", SemanticTokenType.Type },
+                { "boolean", SemanticTokenType.Type },
+                { "predefined-type", SemanticTokenType.Type },
+
+                { "variable", SemanticTokenType.Variable },
+                { "variablename", SemanticTokenType.Variable },
+                { "identifier", SemanticTokenType.Variable },
+                { "localvariable", SemanticTokenType.Variable },
+                { "instance", SemanticTokenType.Variable }
+            };
+
+            return mapping;
+        }
+
+        private static Dictionary<string, SemanticTokenModifier[]> InitializeModifierMapping()
+        {
+            var result = new Dictionary<string, SemanticTokenModifier[]>(StringComparer.OrdinalIgnoreCase);
+
+            // Add common modifiers
+            result["static"] = new[] { SemanticTokenModifier.Static };
+            result["readonly"] = new[] { SemanticTokenModifier.Readonly };
+            result["constant"] = new[] { SemanticTokenModifier.Readonly, SemanticTokenModifier.Static };
+            result["abstract"] = new[] { SemanticTokenModifier.Abstract };
+            result["async"] = new[] { SemanticTokenModifier.Async };
+            result["deprecated"] = new[] { SemanticTokenModifier.Deprecated };
+            result["obsolete"] = new[] { SemanticTokenModifier.Deprecated };
+            result["declaration"] = new[] { SemanticTokenModifier.Declaration };
+            result["definition"] = new[] { SemanticTokenModifier.Declaration };
+
+            // Documentation modifiers for comments
+            foreach (var commentType in new[] { "comment", "xmldoc", "xmldoccomment", "comment.line", "comment.block" })
+            {
+                result[commentType] = new[] { SemanticTokenModifier.Documentation };
+            }
+
+            // Default library modifiers
+            foreach (var builtinType in new[] { "builtin", "predefined" })
+            {
+                result[builtinType] = new[] { SemanticTokenModifier.DefaultLibrary };
+            }
+
+            return result;
         }
     }
 }

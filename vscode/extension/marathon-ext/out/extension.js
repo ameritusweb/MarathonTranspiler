@@ -32,6 +32,15 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
@@ -40,23 +49,51 @@ const path = __importStar(require("path"));
 const node_1 = require("vscode-languageclient/node");
 let client;
 function activate(context) {
-    const serverPath = context.asAbsolutePath(path.join('server', 'MarathonTranspiler.LSP.dll'));
-    const outputChannel = vscode.window.createOutputChannel('Marathon LSP');
-    outputChannel.appendLine(`Extension activated. Working directory: ${serverPath}`);
-    context.subscriptions.push(outputChannel);
-    const serverOptions = {
-        run: { command: "dotnet", args: [serverPath], transport: node_1.TransportKind.stdio },
-        debug: { command: "dotnet", args: [serverPath], transport: node_1.TransportKind.stdio }
-    };
-    const clientOptions = {
-        documentSelector: [{ scheme: "file", language: "mrt" }],
-        synchronize: {
-            configurationSection: "mrtLanguageServer"
-        }
-    };
-    client = new node_1.LanguageClient("mrtLanguageServer", "MRT Language Server", serverOptions, clientOptions);
-    client.start();
+    return __awaiter(this, void 0, void 0, function* () {
+        const serverPath = context.asAbsolutePath(path.join('server', 'MarathonTranspiler.LSP.dll'));
+        const outputChannel = vscode.window.createOutputChannel('Marathon LSP');
+        outputChannel.appendLine(`Extension activated. Working directory: ${serverPath}`);
+        // Ensure semantic highlighting is enabled
+        yield checkSemanticHighlightingSetting(context, outputChannel);
+        // Log available languages
+        vscode.languages.getLanguages().then(langs => {
+            outputChannel.appendLine(`Available Languages: ${langs}`);
+        });
+        context.subscriptions.push(outputChannel);
+        const serverOptions = {
+            run: { command: "dotnet", args: [serverPath], transport: node_1.TransportKind.stdio },
+            debug: { command: "dotnet", args: [serverPath], transport: node_1.TransportKind.stdio }
+        };
+        const clientOptions = {
+            documentSelector: [{ scheme: "file", language: "mrt" }],
+            synchronize: {
+                configurationSection: "mrtLanguageServer"
+            }
+        };
+        client = new node_1.LanguageClient("mrtLanguageServer", "MRT Language Server", serverOptions, clientOptions);
+        client.start();
+    });
 }
 function deactivate() {
     return client ? client.stop() : undefined;
+}
+/**
+ * Ensures that semantic highlighting is enabled
+ */
+function checkSemanticHighlightingSetting(context, outputChannel) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const config = vscode.workspace.getConfiguration('editor');
+        const semanticHighlightingSetting = config.get('semanticHighlighting.enabled');
+        outputChannel.appendLine(`[DEBUG] Current semanticHighlighting setting: ${semanticHighlightingSetting}`);
+        if (semanticHighlightingSetting !== true) {
+            const message = 'Semantic highlighting is disabled. Marathon syntax highlighting will be limited.';
+            const enableButton = 'Enable Now';
+            const selection = yield vscode.window.showWarningMessage(message, enableButton);
+            if (selection === enableButton) {
+                yield config.update('semanticHighlighting.enabled', true, vscode.ConfigurationTarget.Global);
+                vscode.window.showInformationMessage('Semantic highlighting has been enabled.');
+                outputChannel.appendLine("[INFO] Enabled semantic highlighting.");
+            }
+        }
+    });
 }
