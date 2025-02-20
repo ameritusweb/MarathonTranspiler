@@ -80,10 +80,16 @@ namespace MarathonTranspiler.Core
                 case "more":
                     ProcessMore(currentClass, block);
                     break;
+
+                case "hook":
+                    ProcessHook(currentClass, block);
+                    break;
             }
         }
 
         protected virtual void ProcessInject(TranspiledClass currentClass, AnnotatedCode block) { }
+
+        protected virtual void ProcessHook(TranspiledClass currentClass, AnnotatedCode block) { }
 
         protected virtual void ProcessVarInit(TranspiledClass currentClass, AnnotatedCode block)
         {

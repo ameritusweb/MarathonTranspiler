@@ -23,6 +23,12 @@
     <Content Include="Examples\example1.mrt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Examples\example5.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Examples\example5.mrt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Examples\example4.mrt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

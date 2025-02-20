@@ -8,181 +8,13 @@ using MarathonTranspiler.Extensions;
 
 namespace MarathonTranspiler.Transpilers.Orleans
 {
-    public class OrleansTranspiler : MarathonTranspilerBase
+    public partial class OrleansTranspiler : MarathonTranspilerBase
     {
         private readonly OrleansConfig _config;
 
         public OrleansTranspiler(OrleansConfig config)
         {
             _config = config;
-        }
-
-        private string GetGrainInterface(string className)
-        {
-            if (!_config.GrainKeyTypes.TryGetValue(className, out var keyType))
-                keyType = "string";
-
-            return keyType.ToLower() switch
-            {
-                "guid" => "IGrainWithGuidKey",
-                "long" => "IGrainWithIntegerKey",
-                _ => "IGrainWithStringKey"
-            };
-        }
-
-        protected override void ProcessVarInit(TranspiledClass currentClass, AnnotatedCode block)
-        {
-            var annotation = block.Annotations[0];
-            var type = annotation.Values.First(v => v.Key == "type").Value;
-            var propertyName = block.Code[0].Split('=')[0].Replace("this.", "").Trim();
-            var initialValue = block.Code[0].Split('=')[1].Trim().Replace(";", "");
-
-            if (annotation.Values.Any(v => v.Key == "stateName"))
-            {
-                var stateName = annotation.Values.First(v => v.Key == "stateName").Value;
-                var stateId = annotation.Values.FirstOrDefault(v => v.Key == "stateId").Value;
-
-                currentClass.Properties.Add(new TranspiledProperty
-                {
-                    Name = propertyName,
-                    Type = type,
-                    StateName = stateName,
-                    StateId = stateId,
-                    Code = !block.Code[0].StartsWith("this.") ? block.Code[0].Trim() : null,
-                });
-
-                if (block.Code[0].StartsWith("this."))
-                {
-                    // Add initialization to constructor
-                    currentClass.ConstructorLines.Add($"this.{propertyName} = {initialValue};");
-                }
-            }
-            else if (!block.Code[0].StartsWith("this."))
-            {
-                currentClass.Fields.Add(block.Code[0]);
-            }
-            else
-            {
-                currentClass.Properties.Add(new TranspiledProperty
-                {
-                    Name = propertyName,
-                    Type = type
-                });
-                currentClass.ConstructorLines.Add(block.Code[0]);
-            }
-        }
-
-        protected override void ProcessRun(TranspiledClass currentClass, AnnotatedCode block)
-        {
-            var annotation = block.Annotations[0];
-            var functionName = annotation.Values.First(v => v.Key == "functionName").Value;
-            var isAutomatic = annotation.Values.First(v => v.Key == "isAutomatic").Value == "true";
-            var method = GetOrCreateMethod(currentClass, functionName);
-
-            // Set method properties
-            method.Id = annotation.Values.GetValue("id", string.Empty);
-            method.ReturnType = annotation.Values.GetValue("returnType", "void");
-            method.Modifier = annotation.Values.GetValue("modifier", "public");
-
-            foreach (var paramAnnotation in block.Annotations.Skip(1))
-            {
-                if (paramAnnotation.Name == "parameter")
-                {
-                    var paramType = paramAnnotation.Values.First(v => v.Key == "type").Value;
-                    var paramName = paramAnnotation.Values.First(v => v.Key == "name").Value;
-                    var param = $"{paramType} {paramName}";
-                    if (!method.Parameters.Contains(param))
-                    {
-                        method.Parameters.Add(param);
-                    }
-                }
-            }
-
-            method.Code.AddRange(block.Code);
-
-            if (!isAutomatic)
-            {
-                // Add test step for method call
-                var parameters = block.Annotations.Skip(1)
-                    .Where(a => a.Name == "parameter")
-                    .Select(a => a.Values.First(v => v.Key == "value").Value);
-
-                var methodCall = parameters.Any()
-                    ? $"await grain.{functionName}({string.Join(", ", parameters)});"
-                    : $"await grain.{functionName}();";
-
-                currentClass.TestSteps.Add(new TestStep { Code = methodCall, IsAssertion = false });
-            }
-        }
-
-        protected override void ProcessMore(TranspiledClass currentClass, AnnotatedCode block)
-        {
-            var annotation = block.Annotations[0];
-            var id = annotation.Values.First(v => v.Key == "id").Value;
-            var method = currentClass.Methods.FirstOrDefault(m => m.Id == id);
-            int insertIndex = -1;
-
-            if (method == null)
-            {
-                method = currentClass.Methods.FirstOrDefault(x => x.IndexById.ContainsKey(id));
-                if (method != null)
-                {
-                    insertIndex = method.IndexById[id];
-                }
-            }
-            else
-            {
-                insertIndex = method.Code.Count;
-            }
-
-            if (method != null && insertIndex != -1)
-            {
-                if (block.Annotations.Any(a => a.Name == "condition"))
-                {
-                    var conditionAnnotation = block.Annotations.First(x => x.Name == "condition");
-                    var expression = conditionAnnotation.Values.First(v => v.Key == "expression").Value;
-                    var conditionId = conditionAnnotation.Values.GetValue("id");
-
-                    List<string> cblock = new List<string>();
-                    cblock.Add($"if ({expression})");
-                    cblock.Add("{");
-                    cblock.AddRange(block.Code.Select(line => $"\t{line}"));
-                    cblock.Add("}");
-
-                    // Calculate how many lines we're about to insert
-                    int insertedLines = cblock.Count;
-
-                    // Adjust all subsequent indexes
-                    foreach (var kvp in method.IndexById.ToList())
-                    {
-                        if (kvp.Value >= insertIndex)
-                        {
-                            method.IndexById[kvp.Key] += insertedLines;
-                        }
-                    }
-
-                    method.Code.InsertRange(insertIndex, cblock);
-
-                    if (!string.IsNullOrEmpty(conditionId))
-                    {
-                        method.IndexById[conditionId] = insertIndex + insertedLines - 1;
-                    }
-                }
-                else
-                {
-                    // Adjust indexes for non-conditional inserts too
-                    int insertedLines = block.Code.Count;
-                    foreach (var kvp in method.IndexById.ToList())
-                    {
-                        if (kvp.Value >= insertIndex)
-                        {
-                            method.IndexById[kvp.Key] += insertedLines;
-                        }
-                    }
-
-                    method.Code.InsertRange(insertIndex, block.Code);
-                }
-            }
         }
 
         public override string GenerateOutput()
@@ -414,30 +246,17 @@ namespace MarathonTranspiler.Transpilers.Orleans
             return sb.ToString();
         }
 
-        protected override void ProcessAssert(TranspiledClass currentClass, AnnotatedCode block)
+        private string GetGrainInterface(string className)
         {
-            var condition = block.Annotations[0].Values.First(v => v.Key == "condition").Value;
-            var message = block.Code[0].Trim('"');
-            string assertLine = _config.TestFramework.ToLower() switch
+            if (!_config.GrainKeyTypes.TryGetValue(className, out var keyType))
+                keyType = "string";
+
+            return keyType.ToLower() switch
             {
-                "nunit" => $"Assert.That({condition}, \"{message}\");",
-                _ => $"Assert.True({condition}, \"{message}\");"
+                "guid" => "IGrainWithGuidKey",
+                "long" => "IGrainWithIntegerKey",
+                _ => "IGrainWithStringKey"
             };
-            currentClass.TestSteps.Add(new TestStep { Code = assertLine, IsAssertion = true });
-        }
-
-        protected override void ProcessInject(TranspiledClass currentClass, AnnotatedCode block)
-        {
-            var annotation = block.Annotations[0];
-            var type = annotation.Values.First(v => v.Key == "type").Value;
-            var name = annotation.Values.First(v => v.Key == "name").Value;
-
-            currentClass.Injections.Add(new InjectedDependency
-            {
-                Type = type,
-                Name = name
-            });
-            currentClass.Fields.Add($"private readonly {type} {name};");
         }
     }
 }
