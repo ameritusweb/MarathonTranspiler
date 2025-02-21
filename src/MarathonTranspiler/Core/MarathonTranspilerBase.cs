@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Extensions;
+using MarathonTranspiler.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +13,8 @@ namespace MarathonTranspiler.Core
         protected readonly Dictionary<string, TranspiledClass> _classes = new();
         protected readonly List<string> _mainMethodLines = new();
         protected readonly Dictionary<string, string> _idToClassNameMap = new();
+        protected Dictionary<string, TranspiledComponent> Components { get; } = new();
+        protected Dictionary<string, TranspiledPage> Pages { get; } = new();
 
         public void ProcessAnnotatedCode(List<AnnotatedCode> annotatedCodes)
         {
@@ -21,6 +24,24 @@ namespace MarathonTranspiler.Core
                 ProcessBlock(block, previousBlock);
                 previousBlock = block;
             }
+        }
+
+        protected TranspiledPage GetOrCreatePage(string route)
+        {
+            if (!Pages.ContainsKey(route))
+            {
+                Pages[route] = new TranspiledPage { Route = route };
+            }
+            return Pages[route];
+        }
+
+        protected TranspiledComponent GetOrCreateComponent(string name)
+        {
+            if (!Components.ContainsKey(name))
+            {
+                Components[name] = new TranspiledComponent { Name = name };
+            }
+            return Components[name];
         }
 
         protected virtual void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
@@ -83,6 +104,21 @@ namespace MarathonTranspiler.Core
 
                 case "hook":
                     ProcessHook(currentClass, block);
+                    break;
+
+                case "xml":
+                    if (mainAnnotation.Values.Any(v => v.Key == "pageName"))
+                    {
+                        var pageName = mainAnnotation.Values.First(v => v.Key == "pageName").Value;
+                        var currentPage = GetOrCreatePage(pageName);
+                        ProcessXml(currentPage, block);
+                    }
+                    else if (mainAnnotation.Values.Any(v => v.Key == "componentName"))
+                    {
+                        var componentName = mainAnnotation.Values.First(v => v.Key == "componentName").Value;
+                        var currentComponent = GetOrCreateComponent(componentName);
+                        ProcessXml(currentComponent, block);
+                    }
                     break;
             }
         }
@@ -164,6 +200,16 @@ namespace MarathonTranspiler.Core
         protected virtual void ProcessEvent(TranspiledClass currentClass, AnnotatedCode block)
         {
             // Platform-specific event handling to be implemented by derived classes
+        }
+
+        protected virtual void ProcessXml(TranspiledPage currentPage, AnnotatedCode block)
+        {
+            // Platform-specific XML processing to be implemented by derived classes
+        }
+
+        protected virtual void ProcessXml(TranspiledComponent currentComponent, AnnotatedCode block)
+        {
+            // Platform-specific XML processing to be implemented by derived classes
         }
 
         protected TranspiledMethod GetOrCreateMethod(TranspiledClass currentClass, string methodName)

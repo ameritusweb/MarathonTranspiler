@@ -2,6 +2,7 @@
 using MarathonTranspiler.Transpilers.Orleans;
 using MarathonTranspiler.Transpilers.Python;
 using MarathonTranspiler.Transpilers.React;
+using MarathonTranspiler.Transpilers.ReactRedux;
 using MarathonTranspiler.Transpilers.Unity;
 using MarathonTranspiler.Transpilers.Wpf;
 using System;
@@ -32,7 +33,10 @@ namespace MarathonTranspiler
 
         [JsonPropertyName("react")]
         public ReactConfig React { get; set; }
-        
+
+        [JsonPropertyName("react-redux")]
+        public ReactReduxConfig ReactRedux { get; set; }
+
         [JsonPropertyName("epf")]
         public WpfConfig Wpf { get; set; }
     }

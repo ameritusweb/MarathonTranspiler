@@ -1,42 +1,68 @@
-﻿@domInit(target="AppContainer", tag="div", class="max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 shadow-md rounded-lg")
+﻿@xml(pageName="/todos")
+<Page>
+    <AppContainer>
+        <TodoHeader />
+        <TodoList />
+        <TodoFooter />
+    </AppContainer>
+</Page>
 
-@domInit(target="AppHeader", tag="h1", class="text-2xl font-bold mb-4 text-gray-800 dark:text-white")
-Todo App
+@xml(componentName="TodoList")
+<Component>
+    <Prop name="todos" reduxState="true" default="[]" />
+    <Prop name="filter" reduxState="true" default="'all'" />
+    <TodoListWrapper>
+        <FilterSection />
+        <TodoItems />
+    </TodoListWrapper>
+</Component>
 
-@domInit(target="InputSection", tag="div", class="flex mb-6")
+@domInit(target="TodoListWrapper", tag="div", class="max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 shadow-md rounded-lg")
 
-@domInit(target="TodoInput", tag="input", class="flex-grow mr-2 border border-gray-300 dark:border-gray-600 px-3 py-2 rounded-md", value="{inputText}", placeholder="What needs to be done?")
+@varInit(className="TodoStore", type="array")
+this.todos = [];
 
-@domInit(target="AddButton", tag="button", class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-medium", animation="fadeIn")
-Add
+@varInit(className="TodoStore", type="string")
+this.filter = "all";
+
+@run(className="TodoStore", functionName="addTodo")
+@parameter(name="text", type="string")
+this.todos.push({ id: Date.now(), text: text, completed: false });
+
+@run(className="TodoStore", functionName="toggleTodo")
+@parameter(name="id", type="number")
+this.todos = this.todos.map(todo => 
+    todo.id === id ? {...todo, completed: !todo.completed} : todo
+);
+
+@run(className="TodoStore", functionName="removeTodo")
+@parameter(name="id", type="number")
+this.todos = this.todos.filter(todo => todo.id !== id);
+
+@run(className="TodoStore", functionName="setFilter")
+@parameter(name="filter", type="string")
+this.filter = filter;
+
+@run(className="TodoStore", functionName="fetchTodos", isAsync="true")
+this.todos = await fetch('https://api.example.com/todos').then(res => res.json());
+
+@onEvent(className="TodoStore", event="Click", target="addButton")
+this.addTodo("New Task");
+
+@onEvent(className="TodoStore", event="Click", target="clearButton")
+this.todos = this.todos.filter(todo => !todo.completed);
+
+@assert(className="TodoStore", condition="this.todos.length === 0")
+"Todo list should start empty"
+
+@assert(className="TodoStore", action="addTodo", condition="this.todos.length === 1")
+"Adding a todo should increase the count"
+
+@domInit(target="TodoHeader", tag="h1", class="text-2xl font-bold mb-4 text-gray-800 dark:text-white")
+Todo List
 
 @domInit(target="FilterSection", tag="div", class="flex space-x-2 mb-4")
 
-@domInit(target="allFilter", tag="button", class="px-4 py-2 rounded-md font-medium {filter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}")
-All
+@domInit(target="TodoItems", tag="ul", class="divide-y divide-gray-200 dark:divide-gray-700")
 
-@domInit(target="activeFilter", tag="button", class="px-4 py-2 rounded-md font-medium {filter === 'active' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}")
-Active
-
-@domInit(target="completedFilter", tag="button", class="px-4 py-2 rounded-md font-medium {filter === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}")
-Completed
-
-@domInit(target="TodoList", tag="div", class="divide-y divide-gray-200 dark:divide-gray-700", animation="fadeIn")
-
-@domInit(target="StatsSection", tag="div", class="mt-4 text-sm text-gray-500 dark:text-gray-400 flex justify-between")
-
-@domInit(target="ItemsCounter", tag="span")
-{todos.filter(todo => !todo.completed).length} items left
-
-@domInit(target="ClearButton", tag="button", class="{todos.some(todo => todo.completed) ? 'visible' : 'invisible'} text-blue-500 hover:text-blue-700")
-Clear completed
-
-@domInit(target="TodoItemWrapper", tag="div", class="flex items-center p-2 border-b border-gray-200 dark:border-gray-700")
-
-@domInit(target="TodoCheckbox", tag="input", type="checkbox", class="mr-2 h-5 w-5", checked="{completed}", onChange="{onToggle}")
-
-@domInit(target="TodoText", tag="span", class="flex-grow {completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-200'}")
-{text}
-
-@domInit(target="DeleteButton", tag="button", class="ml-2 text-red-500 hover:text-red-700", onClick="{onDelete}")
-×
+@domInit(target="TodoFooter", tag="div", class="mt-4 text-sm text-gray-500 dark:text-gray-400 flex justify-between")

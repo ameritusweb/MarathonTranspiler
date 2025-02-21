@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Model;
 using MarathonTranspiler.Readers;
 
 namespace MarathonTranspiler.Test

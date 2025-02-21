@@ -1,5 +1,6 @@
 ﻿using MarathonTranspiler.Core;
 using MarathonTranspiler.Extensions;
+using MarathonTranspiler.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;

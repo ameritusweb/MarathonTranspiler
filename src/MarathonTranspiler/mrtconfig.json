@@ -1,6 +1,6 @@
 {
   "transpilerOptions": {
-    "target": "net8.0"
+    "target": "csharp"
   },
   "rootDir": "E:/",
   "include": [ "marathon/**/*.mrt" ],
