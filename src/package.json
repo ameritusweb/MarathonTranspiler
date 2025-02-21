@@ -1,0 +1,15 @@
+{
+  "name": "packager",
+  "version": "1.0.0",
+  "description": "packager",
+  "main": "packager.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "ameritusweb",
+  "license": "MIT",
+  "dependencies": {
+    "ignore": "^7.0.3",
+    "yargs": "^17.7.2"
+  }
+}

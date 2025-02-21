@@ -1,0 +1,940 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Core
+{
+    public class AnnotatedCode
+    {
+        public List<Annotation> Annotations { get; set; } = new List<Annotation>();
+
+        public List<string> Code { get; set; } = new List<string>();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Core
+{
+    public class Annotation
+    {
+        public string Name { get; set; }
+
+        public List<KeyValuePair<string, string>> Values { get; set; } = new List<KeyValuePair<string, string>>();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Core
+{
+    public class Config
+    {
+        [JsonPropertyName("transpilerOptions")]
+        public TranspilerOptions TranspilerOptions { get; set; }
+
+        [JsonPropertyName("include")]
+        public List<string> Include { get; set; }
+
+        [JsonPropertyName("exclude")]
+        public List<string> Exclude { get; set; }
+
+        [JsonPropertyName("rootDir")]
+        public string RootDirectory { get; set; }
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Core
+{
+    public class InjectedDependency
+    {
+        public string Type { get; set; }
+        public string Name { get; set; }
+        public string ParameterName => Name.TrimStart('_'); // Convert _logger to logger for parameter
+    }
+}
+
+/* ================================================================================ */
+﻿using MarathonTranspiler.Extensions;
+using MarathonTranspiler.Model;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Core
+{
+    public abstract class MarathonTranspilerBase
+    {
+        protected readonly Dictionary<string, TranspiledClass> _classes = new();
+        protected readonly List<string> _mainMethodLines = new();
+        protected readonly Dictionary<string, string> _idToClassNameMap = new();
+        protected Dictionary<string, TranspiledComponent> Components { get; } = new();
+        protected Dictionary<string, TranspiledPage> Pages { get; } = new();
+
+        public void ProcessAnnotatedCode(List<AnnotatedCode> annotatedCodes)
+        {
+            AnnotatedCode? previousBlock = null;
+            foreach (var block in annotatedCodes)
+            {
+                ProcessBlock(block, previousBlock);
+                previousBlock = block;
+            }
+        }
+
+        protected TranspiledPage GetOrCreatePage(string route)
+        {
+            if (!Pages.ContainsKey(route))
+            {
+                Pages[route] = new TranspiledPage { Route = route };
+            }
+            return Pages[route];
+        }
+
+        protected TranspiledComponent GetOrCreateComponent(string name)
+        {
+            if (!Components.ContainsKey(name))
+            {
+                Components[name] = new TranspiledComponent { Name = name };
+            }
+            return Components[name];
+        }
+
+        protected virtual void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
+        {
+            var mainAnnotation = block.Annotations[0];
+            var className = mainAnnotation.Values.GetValue("className", string.Empty);
+
+            if (className == string.Empty && mainAnnotation.Name == "more")
+            {
+                var cid = mainAnnotation.Values.GetValue("id", string.Empty);
+                className = _idToClassNameMap[cid];
+            }
+
+            foreach (var a in block.Annotations)
+            {
+                var id = a.Values.GetValue("id", string.Empty);
+                if (id != string.Empty && className != string.Empty && !_idToClassNameMap.ContainsKey(id))
+                {
+                    _idToClassNameMap.Add(id, className);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(className))
+            {
+                throw new Exception("Class name not found.");
+            }
+
+            if (!_classes.ContainsKey(className))
+            {
+                _classes[className] = new TranspiledClass { ClassName = className };
+            }
+
+            var currentClass = _classes[className];
+
+            switch (mainAnnotation.Name)
+            {
+                case "varInit":
+                    ProcessVarInit(currentClass, block);
+                    break;
+
+                case "run":
+                    ProcessRun(currentClass, block);
+                    break;
+
+                case "assert":
+                    ProcessAssert(currentClass, block);
+                    break;
+
+                case "onEvent":
+                    ProcessEvent(currentClass, block);
+                    break;
+
+                case "inject":
+                    ProcessInject(currentClass, block);
+                    break;
+
+                case "more":
+                    ProcessMore(currentClass, block);
+                    break;
+
+                case "hook":
+                    ProcessHook(currentClass, block);
+                    break;
+
+                case "xml":
+                    if (mainAnnotation.Values.Any(v => v.Key == "pageName"))
+                    {
+                        var pageName = mainAnnotation.Values.First(v => v.Key == "pageName").Value;
+                        var currentPage = GetOrCreatePage(pageName);
+                        ProcessXml(currentPage, block);
+                    }
+                    else if (mainAnnotation.Values.Any(v => v.Key == "componentName"))
+                    {
+                        var componentName = mainAnnotation.Values.First(v => v.Key == "componentName").Value;
+                        var currentComponent = GetOrCreateComponent(componentName);
+                        ProcessXml(currentComponent, block);
+                    }
+                    break;
+            }
+        }
+
+        protected virtual void ProcessInject(TranspiledClass currentClass, AnnotatedCode block) { }
+
+        protected virtual void ProcessHook(TranspiledClass currentClass, AnnotatedCode block) { }
+
+        protected virtual void ProcessVarInit(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            if (!block.Code[0].StartsWith("this."))
+            {
+                currentClass.Fields.Add(block.Code[0]);
+            }
+            else
+            {
+                var type = block.Annotations[0].Values.First(v => v.Key == "type").Value;
+                var propertyName = block.Code[0].Split('=')[0].Replace("this.", "").Trim();
+                currentClass.Properties.Add(new TranspiledProperty { Name = propertyName, Type = type });
+                currentClass.ConstructorLines.Add(block.Code[0]);
+            }
+        }
+
+        protected virtual void ProcessRun(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            var annotation = block.Annotations[0];
+            var functionName = annotation.Values.First(v => v.Key == "functionName").Value;
+            var method = GetOrCreateMethod(currentClass, functionName);
+
+            foreach (var paramAnnotation in block.Annotations.Skip(1))
+            {
+                if (paramAnnotation.Name == "parameter")
+                {
+                    var param = $"{paramAnnotation.Values.First(v => v.Key == "type").Value} {paramAnnotation.Values.First(v => v.Key == "name").Value}";
+                    if (!method.Parameters.Contains(param))
+                    {
+                        method.Parameters.Add(param);
+                    }
+                }
+            }
+
+            method.Code.AddRange(block.Code);
+
+            if (!annotation.Values.Any(v => v.Key == "enumerableStart" || v.Key == "enumerableEnd"))
+            {
+                var paramValues = block.Annotations.Skip(1)
+                    .Where(a => a.Name == "parameter")
+                    .Select(a => a.Values.First(v => v.Key == "value").Value);
+
+                var instanceName = char.ToLower(currentClass.ClassName[0]) + currentClass.ClassName.Substring(1);
+                _mainMethodLines.Add($"{instanceName}.{functionName}({string.Join(", ", paramValues)});");
+            }
+        }
+
+        protected virtual void ProcessAssert(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            var annotation = block.Annotations[0];
+            var condition = annotation.Values.First(v => v.Key == "condition").Value;
+            var message = block.Code[0].Trim('"');
+
+            // Handle "after" attribute for assertions that should run after a specific method
+            if (annotation.Values.Any(v => v.Key == "after"))
+            {
+                var afterMethod = annotation.Values.First(v => v.Key == "after").Value;
+                var method = GetOrCreateMethod(currentClass, afterMethod);
+                method.Code.Add($"Assert.True({condition}, \"{message}\");");
+            }
+            else
+            {
+                currentClass.Assertions.Add($"Assert.True({condition}, \"{message}\");");
+            }
+        }
+
+        protected virtual void ProcessMore(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            // Platform-specific event handling to be implemented by derived classes
+        }
+
+        protected virtual void ProcessEvent(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            // Platform-specific event handling to be implemented by derived classes
+        }
+
+        protected virtual void ProcessXml(TranspiledPage currentPage, AnnotatedCode block)
+        {
+            // Platform-specific XML processing to be implemented by derived classes
+        }
+
+        protected virtual void ProcessXml(TranspiledComponent currentComponent, AnnotatedCode block)
+        {
+            // Platform-specific XML processing to be implemented by derived classes
+        }
+
+        protected TranspiledMethod GetOrCreateMethod(TranspiledClass currentClass, string methodName)
+        {
+            var method = currentClass.Methods.FirstOrDefault(m => m.Name == methodName);
+            if (method == null)
+            {
+                method = new TranspiledMethod { Name = methodName };
+                currentClass.Methods.Add(method);
+            }
+            return method;
+        }
+
+        public abstract string GenerateOutput();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Extensions
+{
+    public static class AnnotationExtensions
+    {
+        public static string GetValue(this List<KeyValuePair<string, string>> values, string key, string defaultValue = null)
+        {
+            return values.FirstOrDefault(v => v.Key == key).Value ?? defaultValue;
+        }
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.React
+{
+    public class Assertion
+    {
+        // Component being tested
+        public string ClassName { get; set; }
+
+        // The test condition
+        public string Condition { get; set; }
+
+        // Test message/description
+        public string Message { get; set; }
+
+        // Action to test (if any)
+        public string Action { get; set; }
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.React
+{
+    public class AsyncThunk
+    {
+        // Name of the thunk (e.g., "fetchTodos")
+        public string Name { get; set; }
+
+        // Function parameters if any
+        public List<string> Parameters { get; set; } = new();
+
+        // Which state property this affects
+        public string StateProperty { get; set; }
+
+        // The actual async operation (e.g., API request)
+        public string ApiCall { get; set; }
+
+        // Any additional logic inside the thunk
+        public List<string> AdditionalCode { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.React
+{
+    public class ReactComponent : TranspiledComponent
+    {
+        public StoreSlice ReduxSlice { get; set; }
+        public bool IsReduxConnected => ReduxSlice != null;
+        public List<Assertion> Assertions { get; set; } = new();
+        public Dictionary<string, string> DomAttributes { get; set; } = new();
+        public List<ReactComponent> Children { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.React
+{
+    public class ReactPage : TranspiledPage
+    {
+        public List<string> LayoutComponents { get; set; } = new();
+        public Dictionary<string, string> PageMetadata { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.React
+{
+    public class ReduxAction
+    {
+        // Name of the action (e.g., "addTodo")
+        public string Name { get; set; }
+
+        // Parameters for the action
+        public List<string> Parameters { get; set; } = new();
+
+        // The code that runs when action is dispatched
+        public List<string> Code { get; set; } = new();
+    }
+
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.React
+{
+    public class StoreSlice
+    {
+        // Name of the Redux slice (e.g., "todos", "cart")
+        public string Name { get; set; }
+
+        // State variables and their default values
+        public Dictionary<string, string> InitialState { get; set; } = new();
+
+        // Standard Redux actions
+        public List<ReduxAction> Actions { get; set; } = new();
+
+        // Async operations (thunks)
+        public List<AsyncThunk> AsyncThunks { get; set; } = new();
+
+        // Tracks if the slice has useSelector hooks
+        public bool UsesSelectors { get; set; } = false;
+
+        // Tracks if the slice has dispatchable actions
+        public bool UsesDispatch { get; set; } = false;
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model
+{
+    public class TestStep
+    {
+        public string Code { get; set; }
+        public bool IsAssertion { get; set; }
+    }
+}
+
+/* ================================================================================ */
+﻿using MarathonTranspiler.Core;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model
+{
+    public class TranspiledClass
+    {
+        public string ClassName { get; set; }
+        public List<string> Fields { get; set; } = new();
+        public List<TranspiledProperty> Properties { get; set; } = new();
+        public List<TranspiledMethod> Methods { get; set; } = new();
+        public List<string> ConstructorLines { get; set; } = new();
+        public List<string> Assertions { get; set; } = new();
+        public bool IsAbstract { get; set; }
+        public string BaseClass { get; set; }
+        public Dictionary<string, List<string>> AdditionalData { get; set; } = new();
+        public List<TestStep> TestSteps { get; set; } = new();
+        public List<InjectedDependency> Injections { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model
+{
+    public class TranspiledComponent
+    {
+        public string Name { get; set; }
+        public List<string> Props { get; set; } = new();
+        public HashSet<string> RequiredImports { get; set; } = new();
+        public List<string> Code { get; set; } = new();
+        public Dictionary<string, object> Metadata { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model
+{
+    public class TranspiledMethod
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public List<string> Parameters { get; set; } = new();
+        public List<string> Code { get; set; } = new();
+        public bool IsAbstract { get; set; }
+        public string? ReturnType { get; set; }
+        public string? Modifier { get; set; }
+        public bool IsStatic { get; set; }
+        public bool IsProperty { get; set; }
+        public bool IsCoroutine { get; set; }
+        public bool IsAutomatic { get; set; }
+        public Dictionary<string, int> IndexById { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model
+{
+    public class TranspiledPage : TranspiledComponent
+    {
+        public string Route { get; set; }
+        public bool IsSecure { get; set; }
+        public Dictionary<string, string> RouteParameters { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model
+{
+    public class TranspiledProperty
+    {
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public string StateName { get; set; }
+        public string StateId { get; set; }
+        public string? Code { get; set; }
+    }
+}
+
+/* ================================================================================ */
+﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Transpilers.CSharp;
+using MarathonTranspiler.Transpilers.Orleans;
+using MarathonTranspiler.Transpilers.Python;
+using MarathonTranspiler.Transpilers.React;
+using MarathonTranspiler.Transpilers.ReactRedux;
+using MarathonTranspiler.Transpilers.Unity;
+using MarathonTranspiler.Transpilers.Wpf;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model
+{
+    public class TranspilerFactory
+    {
+        public static MarathonTranspilerBase CreateTranspiler(TranspilerOptions options)
+        {
+            return options.Target.ToLower() switch
+            {
+                "csharp" => new CSharpTranspiler(options.CSharp),
+                "orleans" => new OrleansTranspiler(options.Orleans),
+                "unity" => new UnityTranspiler(options.Unity),
+                "react" => new ReactTranspiler(options.React),
+                "react-redux" => new ReactReduxTranspiler(options.ReactRedux),
+                "python" => new PythonTranspiler(options.Python),
+                "wpf" => new WpfTranspiler(options.Wpf),
+                _ => throw new ArgumentException($"Unsupported target: {options.Target}")
+            };
+        }
+    }
+}
+
+/* ================================================================================ */
+// <autogenerated />
+using System;
+using System.Reflection;
+[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute(".NETCoreApp,Version=v8.0", FrameworkDisplayName = ".NET 8.0")]
+
+/* ================================================================================ */
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by a tool.
+//     Runtime Version:4.0.30319.42000
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: System.Reflection.AssemblyCompanyAttribute("MarathonTranspiler")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eb56f655b289ded7e81569bc1f074c5fa9649cea")]
+[assembly: System.Reflection.AssemblyProductAttribute("MarathonTranspiler")]
+[assembly: System.Reflection.AssemblyTitleAttribute("MarathonTranspiler")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
+
+// Generated by the MSBuild WriteCodeFragment class.
+
+
+/* ================================================================================ */
+// <auto-generated/>
+global using global::System;
+global using global::System.Collections.Generic;
+global using global::System.IO;
+global using global::System.Linq;
+global using global::System.Net.Http;
+global using global::System.Threading;
+global using global::System.Threading.Tasks;
+
+/* ================================================================================ */
+// <autogenerated />
+using System;
+using System.Reflection;
+[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute(".NETCoreApp,Version=v8.0", FrameworkDisplayName = ".NET 8.0")]
+
+/* ================================================================================ */
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by a tool.
+//     Runtime Version:4.0.30319.42000
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: System.Reflection.AssemblyCompanyAttribute("MarathonTranspiler")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bda8c36511f37dde78d711277873af8d4fa0c06b")]
+[assembly: System.Reflection.AssemblyProductAttribute("MarathonTranspiler")]
+[assembly: System.Reflection.AssemblyTitleAttribute("MarathonTranspiler")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
+
+// Generated by the MSBuild WriteCodeFragment class.
+
+
+/* ================================================================================ */
+// <auto-generated/>
+global using global::System;
+global using global::System.Collections.Generic;
+global using global::System.IO;
+global using global::System.Linq;
+global using global::System.Net.Http;
+global using global::System.Threading;
+global using global::System.Threading.Tasks;
+
+/* ================================================================================ */
+// <autogenerated />
+using System;
+using System.Reflection;
+[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute(".NETCoreApp,Version=v8.0", FrameworkDisplayName = ".NET 8.0")]
+
+/* ================================================================================ */
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by a tool.
+//     Runtime Version:4.0.30319.42000
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: System.Reflection.AssemblyCompanyAttribute("MarathonTranspiler")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bda8c36511f37dde78d711277873af8d4fa0c06b")]
+[assembly: System.Reflection.AssemblyProductAttribute("MarathonTranspiler")]
+[assembly: System.Reflection.AssemblyTitleAttribute("MarathonTranspiler")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
+
+// Generated by the MSBuild WriteCodeFragment class.
+
+
+/* ================================================================================ */
+// <auto-generated/>
+global using global::System;
+global using global::System.Collections.Generic;
+global using global::System.IO;
+global using global::System.Linq;
+global using global::System.Net.Http;
+global using global::System.Threading;
+global using global::System.Threading.Tasks;
+
+/* ================================================================================ */
+﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Model;
+using MarathonTranspiler.Readers;
+using Microsoft.Extensions.FileSystemGlobbing;
+using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
+using System.Text.Json;
+
+namespace MarathonTranspiler
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            var currentDirectory = Directory.GetCurrentDirectory();
+
+            // Path to the JSON file
+            string jsonFilePath = currentDirectory + "\\mrtconfig.json";
+
+            // Read and deserialize the JSON file
+            string jsonContent = File.ReadAllText(jsonFilePath);
+            Config config = JsonSerializer.Deserialize<Config>(jsonContent);
+
+            // Create a Matcher instance
+            var matcher = new Matcher();
+
+            // Add include patterns
+            foreach (var includePattern in config.Include)
+            {
+                matcher.AddInclude(includePattern);
+            }
+
+            // Add exclude patterns
+            foreach (var excludePattern in config.Exclude)
+            {
+                matcher.AddExclude(excludePattern);
+            }
+
+            // Specify the root directory for the search
+            string rootDirectory = config.RootDirectory;
+            var directoryInfo = new DirectoryInfoWrapper(new DirectoryInfo(rootDirectory));
+
+            // Execute the matcher
+            var matchingResult = matcher.Execute(directoryInfo);
+
+            // Output the matched files
+            foreach (var file in matchingResult.Files)
+            {
+                var fullPath = Path.Combine(rootDirectory, file.Path);
+                var marathonReader = new MarathonReader();
+                var annotatedCode = marathonReader.ReadFile(fullPath);
+
+                var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions);
+                transpiler.ProcessAnnotatedCode(annotatedCode);
+                var outputCode = transpiler.GenerateOutput();
+
+                // Write the transpiled code to a .cs file
+                var outputPath = Path.ChangeExtension(fullPath, ".cs");
+                File.WriteAllText(outputPath, outputCode);
+            }
+        }
+    }
+}
+
+/* ================================================================================ */
+﻿using MarathonTranspiler.Core;
+using System.Text.RegularExpressions;
+
+namespace MarathonTranspiler.Readers
+{
+    public class MarathonReader
+    {
+        private static readonly Regex AnnotationRegex = new(@"^@(\w+)\((.*)\)$");
+        private static readonly Regex KeyValueRegex = new(@"(\w+)=""([^""]*)"",?");
+
+        public List<AnnotatedCode> ParseFile(List<string> lines)
+        {
+            var annotatedCodes = new List<AnnotatedCode>();
+            var currentAnnotation = new Annotation();
+            var currentCode = new List<string>();
+            var currentBlock = new AnnotatedCode();
+
+            foreach (var line in lines)
+            {
+                var trimmedLine = line.Trim();
+
+                // Skip empty lines
+                if (string.IsNullOrWhiteSpace(trimmedLine))
+                    continue;
+
+                var annotationMatch = AnnotationRegex.Match(trimmedLine);
+                if (annotationMatch.Success)
+                {
+                    // If we have existing code, save it to the current block
+                    if (currentCode.Count > 0)
+                    {
+                        currentBlock.Code = new List<string>(currentCode);
+                        annotatedCodes.Add(currentBlock);
+
+                        // Reset for new block
+                        currentBlock = new AnnotatedCode();
+                        currentCode.Clear();
+                    }
+
+                    // Parse the annotation
+                    currentAnnotation = new Annotation
+                    {
+                        Name = annotationMatch.Groups[1].Value,
+                        Values = new List<KeyValuePair<string, string>>()
+                    };
+
+                    // Parse key-value pairs
+                    var keyValueContent = annotationMatch.Groups[2].Value;
+                    var keyValueMatches = KeyValueRegex.Matches(keyValueContent);
+
+                    foreach (Match kvMatch in keyValueMatches)
+                    {
+                        var key = kvMatch.Groups[1].Value;
+                        var value = kvMatch.Groups[2].Value;
+                        currentAnnotation.Values.Add(new KeyValuePair<string, string>(key, value));
+                    }
+
+                    currentBlock.Annotations.Add(currentAnnotation);
+                }
+                else
+                {
+                    // Add code line
+                    currentCode.Add(trimmedLine);
+                }
+            }
+
+            // Don't forget to add the last block if it contains code
+            if (currentCode.Count > 0)
+            {
+                currentBlock.Code = new List<string>(currentCode);
+                annotatedCodes.Add(currentBlock);
+            }
+
+            return annotatedCodes;
+        }
+
+        public List<AnnotatedCode> ReadFile(string filePath)
+        {
+            var lines = File.ReadAllLines(filePath).ToList();
+            return ParseFile(lines);
+        }
+    }
+}
+/* ================================================================================ */
+﻿using MarathonTranspiler.Transpilers.CSharp;
+using MarathonTranspiler.Transpilers.Orleans;
+using MarathonTranspiler.Transpilers.Python;
+using MarathonTranspiler.Transpilers.React;
+using MarathonTranspiler.Transpilers.ReactRedux;
+using MarathonTranspiler.Transpilers.Unity;
+using MarathonTranspiler.Transpilers.Wpf;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler
+{
+    public class TranspilerOptions
+    {
+        [JsonPropertyName("target")]
+        public string Target { get; set; }
+
+        [JsonPropertyName("csharp")]
+        public CSharpConfig CSharp { get; set; }
+
+        [JsonPropertyName("orleans")]
+        public OrleansConfig Orleans { get; set; }
+
+        [JsonPropertyName("unity")]
+        public UnityConfig Unity { get; set; }
+
+        [JsonPropertyName("python")]
+        public PythonConfig Python { get; set; }
+
+        [JsonPropertyName("react")]
+        public ReactConfig React { get; set; }
+
+        [JsonPropertyName("react-redux")]
+        public ReactReduxConfig ReactRedux { get; set; }
+
+        [JsonPropertyName("epf")]
+        public WpfConfig Wpf { get; set; }
+    }
+}
