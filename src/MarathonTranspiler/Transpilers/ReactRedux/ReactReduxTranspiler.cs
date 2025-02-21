@@ -350,7 +350,10 @@ namespace MarathonTranspiler.Transpilers.ReactRedux
         private void GenerateJSX(StringBuilder sb, ReactComponent component, int indent)
         {
             var spaces = new string(' ', indent * 2);
-            sb.AppendLine($"{spaces}<div className=\"{component.DomAttributes.GetValueOrDefault("className")}\">");
+
+            string tag = component.DomAttributes.GetValueOrDefault("tag", "div");
+
+            sb.AppendLine($"{spaces}<{tag} className=\"{component.DomAttributes.GetValueOrDefault("className")}\">");
 
             foreach (var child in component.Children)
             {
