@@ -9,6 +9,9 @@
   "categories": [
     "Programming Languages"
   ],
+  "repository": {
+    "url": "https://github.com/ameritusweb/MarathonTranspiler"
+  },
   "main": "./out/extension",
   "scripts": {
     "compile": "tsc -p .",
@@ -18,47 +21,47 @@
   },
   "contributes": {
     "semanticTokenScopes": [
-    {
-      "language": "mrt",
-      "scopes": {
-        "keyword": [
-          "keyword.control.annotation.mrt",
-          "keyword.control.js"
-        ],
-        "function": [
-          "entity.name.function.js"
-        ],
-        "class": [
-          "entity.name.class"
-        ],
-        "variable": [
-          "variable.other.object.js",
-          "variable.other.readwrite"
-        ],
-        "comment": [
-          "comment.line.double-slash.mrt",
-          "comment.block.mrt"
-        ],
-        "string": [
-          "string.quoted.double.mrt"
-        ],
-        "number": [
-          "constant.numeric.js"
-        ]
+      {
+        "language": "mrt",
+        "scopes": {
+          "keyword": [
+            "keyword.control.annotation.mrt",
+            "keyword.control.js"
+          ],
+          "function": [
+            "entity.name.function.js"
+          ],
+          "class": [
+            "entity.name.class"
+          ],
+          "variable": [
+            "variable.other.object.js",
+            "variable.other.readwrite"
+          ],
+          "comment": [
+            "comment.line.double-slash.mrt",
+            "comment.block.mrt"
+          ],
+          "string": [
+            "string.quoted.double.mrt"
+          ],
+          "number": [
+            "constant.numeric.js"
+          ]
+        }
       }
-    }
-  ],
+    ],
     "semanticTokenTypes": [
       {
-        "id": "keyword", 
+        "id": "keyword",
         "description": "Language keywords"
       },
       {
-        "id": "type", 
+        "id": "type",
         "description": "Language types"
       },
       {
-        "id": "property", 
+        "id": "property",
         "description": "Language properties"
       },
       {
@@ -92,21 +95,21 @@
         "id": "parameter",
         "description": "Function parameters"
       }
-  ],
-  "semanticTokenModifiers": [
-    {
-      "id": "declaration",
-      "description": "Declarations"
-    },
-    {
-      "id": "definition",
-      "description": "Definitions"
-    },
-    {
-      "id": "readonly",
-      "description": "Read-only elements"
-    }
-  ],
+    ],
+    "semanticTokenModifiers": [
+      {
+        "id": "declaration",
+        "description": "Declarations"
+      },
+      {
+        "id": "definition",
+        "description": "Definitions"
+      },
+      {
+        "id": "readonly",
+        "description": "Read-only elements"
+      }
+    ],
     "languages": [
       {
         "id": "mrt",
@@ -131,9 +134,7 @@
   "devDependencies": {
     "@types/node": "^22.13.4",
     "@types/vscode": "^1.97.0",
-    "typescript": "^5.7.3"
-  },
-  "dependencies": {
+    "typescript": "^5.7.3",
     "vscode": "^1.1.37",
     "vscode-languageclient": "^9.0.1"
   }
