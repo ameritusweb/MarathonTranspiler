@@ -84,7 +84,7 @@ namespace MarathonTranspiler.LSP
                 Kind = CompletionItemKind.Snippet,
                 InsertTextFormat = InsertTextFormat.Snippet,
                 // Remove @ from InsertText to prevent duplication
-                InsertText = "assert(condition=\"${1:this.Position < this.Text.Length}\")",
+                InsertText = "assert(className=\"${1:ClassName}\", condition=\"${2:this.Position < this.Text.Length}\")",
                 Documentation = new MarkupContent
                 {
                     Kind = MarkupKind.Markdown,
@@ -324,6 +324,8 @@ namespace MarathonTranspiler.LSP
                 }
                 else if (annotationType == "@assert")
                 {
+                    if (!existingParams.Contains("className"))
+                        parameterList.AddRange(ParameterSnippets["className"]);
                     if (!existingParams.Contains("condition"))
                         parameterList.AddRange(ParameterSnippets["condition"]);
                 }

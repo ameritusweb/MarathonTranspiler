@@ -47,7 +47,7 @@
 			"patterns": [
 			  {
 				"name": "entity.name.tag.property.mrt",
-				"match": "\\b(className|type|id|functionName|expression)\\b",
+				"match": "\\b(className|type|id|functionName|expression|condition)\\b",
 				"captures": {
 				  "0": {
 					"name": "entity.other.attribute-name.mrt"

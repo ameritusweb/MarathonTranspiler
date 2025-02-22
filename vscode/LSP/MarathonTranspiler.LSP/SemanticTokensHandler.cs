@@ -738,6 +738,7 @@ namespace MarathonTranspiler.LSP
                 { "stringescape", SemanticTokenType.String },
                 { "characterliteral", SemanticTokenType.String },
                 { "verbatimstring", SemanticTokenType.String },
+                { "xml attribute value", SemanticTokenType.String },
 
                 { "class", SemanticTokenType.Class },
                 { "interface", SemanticTokenType.Class },
@@ -775,14 +776,13 @@ namespace MarathonTranspiler.LSP
                 { "cssselectorclass", SemanticTokenType.Parameter },
                 { "cssselectorid", SemanticTokenType.Parameter },
                 { "parameter", SemanticTokenType.Parameter },
+                { "xml attribute", SemanticTokenType.Parameter },
 
                 { "constant", SemanticTokenType.Type },
                 { "null", SemanticTokenType.Type },
                 { "boolean", SemanticTokenType.Type },
                 { "predefined-type", SemanticTokenType.Type },
-                { "xml name", SemanticTokenType.Type },
-
-                { "xml attribute", SemanticTokenType.Property },
+                { "xml name", SemanticTokenType.Type },     
 
                 { "variable", SemanticTokenType.Variable },
                 { "variablename", SemanticTokenType.Variable },

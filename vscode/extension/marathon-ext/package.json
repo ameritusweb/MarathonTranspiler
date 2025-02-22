@@ -55,12 +55,10 @@
       },
       {
         "id": "type", 
-        "superType": "keyword",
         "description": "Language types"
       },
       {
         "id": "property", 
-        "superType": "type",
         "description": "Language properties"
       },
       {
@@ -70,12 +68,10 @@
       },
       {
         "id": "variable",
-        "superType": "type",
         "description": "Variables and fields"
       },
       {
         "id": "string",
-        "superType": "type",
         "description": "String literals"
       },
       {
@@ -94,7 +90,6 @@
       },
       {
         "id": "parameter",
-        "superType": "variable",
         "description": "Function parameters"
       }
   ],
