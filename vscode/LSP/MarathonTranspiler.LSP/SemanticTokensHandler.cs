@@ -12,6 +12,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
+using MediatR.Pipeline;
+using System.Runtime.Serialization;
 
 namespace MarathonTranspiler.LSP
 {
@@ -19,6 +22,7 @@ namespace MarathonTranspiler.LSP
     {
         private readonly Workspace _workspace;
         private readonly SemanticTokensLegend _legend;
+        private readonly ConcurrentDictionary<string, List<SemanticTokenData>> _codeBlockCache = new ConcurrentDictionary<string, List<SemanticTokenData>>();
 
         // Cache for language mapping and configuration
         private static readonly ConcurrentDictionary<string, string> _targetLanguageCache = new ConcurrentDictionary<string, string>();
@@ -48,7 +52,9 @@ namespace MarathonTranspiler.LSP
                         SemanticTokenType.Number,
                         SemanticTokenType.Keyword,
                         SemanticTokenType.Comment,
-                        SemanticTokenType.Parameter
+                        SemanticTokenType.Parameter,
+                        SemanticTokenType.Type,
+                        SemanticTokenType.Property
                     ),
                 TokenModifiers = new Container<SemanticTokenModifier>(
                         SemanticTokenModifier.Declaration,
@@ -70,9 +76,9 @@ namespace MarathonTranspiler.LSP
                 Legend = this._legend,
                 Full = new SemanticTokensCapabilityRequestFull
                 {
-                    Delta = false
+                    Delta = true,
                 },
-                Range = true
+                Range = false
             };
         }
 
@@ -80,13 +86,83 @@ namespace MarathonTranspiler.LSP
         private readonly ConcurrentDictionary<string, (DateTime timestamp, SemanticTokens tokens)> _tokenCache =
             new ConcurrentDictionary<string, (DateTime, SemanticTokens)>();
 
-        // Maximum age of cached tokens (1 second)
-        private static readonly TimeSpan _cacheTimeout = TimeSpan.FromSeconds(1);
+        private int _lineCount = 0;
+
+        // Maximum age of cached tokens (10 seconds)
+        private static readonly TimeSpan _cacheTimeout = TimeSpan.FromSeconds(10);
 
         public override async Task<SemanticTokensFullOrDelta?> Handle(SemanticTokensDeltaParams request, CancellationToken cancellationToken)
         {
             // Delta requests are always processed by base class
-            return await base.Handle(request, cancellationToken);
+            // return await base.Handle(request, cancellationToken);
+
+            var identifier = request.TextDocument;
+            var uri = identifier.Uri;
+            string docKey = request.TextDocument.Uri.ToString();
+
+            // Check if we have a recent cached result
+            if (_tokenCache.TryGetValue(docKey, out var cachedFirst) &&
+                (DateTime.UtcNow - cachedFirst.timestamp) < _cacheTimeout)
+            {
+                return GetEmptyDelta();
+            }
+
+            var document = new SemanticTokensDocument(this._legend);
+            var builder = document.Create();
+
+            await Tokenize(builder, request, cancellationToken);
+
+            var semanticTokens = builder.Commit().GetSemanticTokens();
+
+            // Check if we have a cached result
+            if (_tokenCache.TryGetValue(docKey, out var cached))
+            {
+                if (semanticTokens != null)
+                {
+                    var length = semanticTokens.Data.Length;
+                    var cachedLength = cached.tokens.Data.Length;
+                    string[] lines = _workspace.GetDocumentLines(uri);
+
+                    if (length == cachedLength && lines.Length == _lineCount)
+                    {
+                        _lineCount = lines.Length;
+                        return GetEmptyDelta();
+                    }
+                    else if (semanticTokens != null)
+                    {
+                        _lineCount = lines.Length;
+                        _tokenCache[docKey] = (DateTime.UtcNow, semanticTokens);
+                    }
+                    else
+                    {
+                        _lineCount = lines.Length;
+                    }
+                }
+            }
+
+            if (semanticTokens == null)
+            {
+                return GetEmptyDelta();
+            }
+
+            var full = new SemanticTokensFullOrDelta(semanticTokens);
+
+            return full;
+        }
+
+        public SemanticTokensFullOrDelta GetEmptyDelta()
+        {
+            List<SemanticTokensEdit> tokensEdit = new List<SemanticTokensEdit>();
+
+            var pResult = new SemanticTokensDeltaPartialResult
+            {
+                Edits = Container<SemanticTokensEdit>.From(tokensEdit)
+            };
+
+            var semanticDelta = new SemanticTokensDelta(pResult);
+            var sDelta = new SemanticTokensFullOrDelta(semanticDelta);
+
+            return sDelta;
         }
 
         public override async Task<SemanticTokens?> Handle(SemanticTokensParams request, CancellationToken cancellationToken)
@@ -114,6 +190,14 @@ namespace MarathonTranspiler.LSP
 
         public override async Task<SemanticTokens?> Handle(SemanticTokensRangeParams request, CancellationToken cancellationToken)
         {
+            string docKey = request.TextDocument.Uri.ToString();
+
+            // Check if we have a recent cached result
+            if (_tokenCache.TryGetValue(docKey, out var cached))
+            {
+                return cached.tokens;
+            }
+
             // Range requests should be processed directly since they're for specific regions
             return await base.Handle(request, cancellationToken);
         }
@@ -139,6 +223,7 @@ namespace MarathonTranspiler.LSP
             // Get target language (with caching)
             var targetLanguage = GetTargetLanguageFromConfig(uri);
             var colorCodeLanguage = GetColorCodeLanguage(targetLanguage);
+            var originalColorCodeLanguage = colorCodeLanguage;
 
             // Create a custom ColorCode formatter that builds semantic tokens
             var formatter = new SemanticTokenFormatter(builder, _tokenTypeMapping, _modifierMapping);
@@ -149,6 +234,20 @@ namespace MarathonTranspiler.LSP
 
             int currentLineNumber = 0;
 
+            for (int i = 0; i < lines.Length; ++i)
+            {
+                if (lines[i].Trim().Length == 0)
+                {
+                    currentLineNumber++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            bool useCache = true;
+
             foreach (var block in annotatedBlocks)
             {
                 // Check for cancellation frequently
@@ -156,51 +255,107 @@ namespace MarathonTranspiler.LSP
                     return Task.CompletedTask;
 
                 // Handle annotations first
-                foreach (var annotation in block.Annotations)
+                if (block.Annotations.Any())
                 {
-                    // Find the line containing this annotation
-                    int annotationLineNumber = FindAnnotationLine(lines, annotation, currentLineNumber);
-                    if (annotationLineNumber >= 0)
+                    var firstAnnotation = block.Annotations[0];
+                    if (firstAnnotation.Name == "xml")
                     {
-                        // Highlight the annotation structure
-                        HighlightAnnotation(builder, lines[annotationLineNumber], annotation, annotationLineNumber);
-                        currentLineNumber = annotationLineNumber + 1;
+                        colorCodeLanguage = ColorCode.Languages.Xml;
+                    }
+                    else
+                    {
+                        colorCodeLanguage = originalColorCodeLanguage;
+                    }
+
+                    foreach (var annotation in block.Annotations)
+                    {
+                        // Find the line containing this annotation
+                        int annotationLineNumber = FindAnnotationLine(lines, annotation, currentLineNumber);
+                        if (annotationLineNumber >= 0)
+                        {
+                            // Highlight the annotation structure
+                            HighlightAnnotation(builder, lines[annotationLineNumber], annotation, annotationLineNumber);
+                            currentLineNumber = annotationLineNumber + 1;
+                        }
                     }
                 }
 
                 // Now handle the code block with language-specific highlighting
                 if (block.Code.Count > 0)
                 {
-                    // For larger code blocks, process in parallel
-                    if (block.Code.Count > 50 && !cancellationToken.IsCancellationRequested)
+                    string codeText = string.Join(Environment.NewLine, block.RawCode);
+                    string blockHash = ComputeHash(codeText);
+
+                    if (useCache && _codeBlockCache.TryGetValue(blockHash, out var cachedTokens))
                     {
-                        // Join with StringBuilder to avoid excessive string allocations
-                        var codeText = new StringBuilder();
-                        foreach (var line in block.Code)
+                        if (cachedTokens.Any(x => !lines[x.Line].Contains(x.Token)))
                         {
-                            codeText.AppendLine(line);
+                            useCache = false;
+                            CacheMiss(builder, formatter, codeText, colorCodeLanguage, blockHash, currentLineNumber);
                         }
-
-                        // Set the current line offset in the formatter
-                        formatter.LineOffset = currentLineNumber;
-
-                        // Format the code
-                        formatter.Format(codeText.ToString(), colorCodeLanguage);
+                        else
+                        {
+                            // Apply cached tokens
+                            foreach (var token in cachedTokens)
+                            {
+                                builder.Push(
+                                    token.Line,
+                                    token.Column,
+                                    token.Length,
+                                    token.TokenType,
+                                    token.Modifiers
+                                );
+                            }
+                        }
                     }
                     else
                     {
-                        // For smaller blocks, use simpler approach
-                        var codeText = string.Join(Environment.NewLine, block.Code);
-                        formatter.LineOffset = currentLineNumber;
-                        formatter.Format(codeText, colorCodeLanguage);
+                        useCache = false;
+                        CacheMiss(builder, formatter, codeText, colorCodeLanguage, blockHash, currentLineNumber);
                     }
 
                     // Update line position
-                    currentLineNumber += block.Code.Count;
+                    currentLineNumber += block.RawCode.Count;
                 }
             }
 
             return Task.CompletedTask;
+        }
+
+        private void CacheMiss(SemanticTokensBuilder builder, SemanticTokenFormatter formatter, string codeText, ILanguage colorCodeLanguage, string blockHash, int currentLineNumber)
+        {
+            // Cache miss or we're no longer using cache, process the block
+            List<SemanticTokenData> blockTokens = new List<SemanticTokenData>();
+
+            // Set the current line offset in the formatter
+            formatter.CurrentTokens = blockTokens;
+
+            // Format the code
+            formatter.Format(codeText, colorCodeLanguage, currentLineNumber);
+
+            // Cache the tokens for this block
+            _codeBlockCache[blockHash] = blockTokens;
+
+            // Apply the tokens to the builder
+            foreach (var token in blockTokens)
+            {
+                builder.Push(
+                    token.Line,
+                    token.Column,
+                    token.Length,
+                    token.TokenType,
+                    token.Modifiers
+                );
+            }
+        }
+
+        private string ComputeHash(string text)
+        {
+            using (var sha256 = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(text));
+                return Convert.ToBase64String(bytes);
+            }
         }
 
         // Optimized ColorCode formatter that builds semantic tokens
@@ -213,6 +368,12 @@ namespace MarathonTranspiler.LSP
 
             public int LineOffset { get; set; } = 0;
 
+            public int GlobalColumnOffset { get; set; } = 0;
+
+            public int CurrentLine { get; set; } = 0;
+
+            public List<SemanticTokenData> CurrentTokens { get; set; }
+
             public SemanticTokenFormatter(
                 SemanticTokensBuilder builder,
                 Dictionary<string, SemanticTokenType> tokenTypeMapping,
@@ -224,20 +385,45 @@ namespace MarathonTranspiler.LSP
                 _modifierMapping = modifierMapping;
             }
 
-            public void Format(string sourceCode, ILanguage language)
+            public void Format(string sourceCode, ILanguage language, int startLineNumber)
             {
-                // Calculate line starts for position mapping - this is a performance bottleneck
-                // for large files, so let's optimize it
-                _lineStarts = CalculateLineStartsOptimized(sourceCode);
+                this.CurrentLine = startLineNumber;
 
                 // Use the language parser from the base class
                 languageParser.Parse(sourceCode, language, (parsedCode, scopes) => Write(parsedCode, scopes));
             }
 
             protected override void Write(string parsedSourceCode, IList<Scope> scopes)
-            {
-                // Process scopes to create semantic tokens
-                ProcessScopes(scopes, parsedSourceCode);
+            {       
+                if (scopes.Count == 0)
+                {
+                    var split = parsedSourceCode.Split("\r\n").ToList();
+                    if (split.Count > 1)
+                    {
+                        this.CurrentLine++;
+
+
+                        if (split.Count > 2)
+                        {
+                            this.CurrentLine += (split.Count - 2);
+                        }
+
+                        var l = parsedSourceCode.Replace("\r\n", "").Replace("\n", "");
+                        var tl = l.TrimEnd();
+                        var diff = l.Length - tl.Length;
+                        this.GlobalColumnOffset = diff;
+                    }
+                    else
+                    {
+                        this.GlobalColumnOffset += parsedSourceCode.Length;
+                    }
+                }
+                else
+                {
+                    // Process scopes to create semantic tokens
+                    ProcessScopes(scopes, parsedSourceCode);
+                    this.GlobalColumnOffset += parsedSourceCode.Length;
+                }
             }
 
             private void ProcessScopes(IList<Scope> scopes, string sourceCode)
@@ -294,9 +480,8 @@ namespace MarathonTranspiler.LSP
 
                 // Handle multi-line tokens more efficiently
                 int currentPos = start;
-                int lineStartIndex = BinarySearchLineStart(currentPos);
-                int currentLine = lineStartIndex;
-                int currentColumn = currentPos - _lineStarts[currentLine];
+                int currentLine = 0;
+                int currentColumn = currentPos;
 
                 int end = start + length;
                 while (currentPos < end)
@@ -307,13 +492,17 @@ namespace MarathonTranspiler.LSP
 
                     if (tokenLengthInLine > 0)
                     {
-                        _builder.Push(
-                            currentLine + LineOffset,
-                            currentColumn,
-                            tokenLengthInLine,
-                            tokenType,
-                            modifiers
-                        );
+                        var tokenData = new SemanticTokenData
+                        {
+                            Line = this.CurrentLine + currentLine,
+                            Column = this.GlobalColumnOffset + currentColumn,
+                            Length = tokenLengthInLine,
+                            Token = sourceCode,
+                            TokenType = tokenType,
+                            Modifiers = modifiers
+                        };
+
+                        CurrentTokens.Add(tokenData);
                     }
 
                     if (lineEnd < end)
@@ -345,61 +534,6 @@ namespace MarathonTranspiler.LSP
                     }
                 }
                 return end;
-            }
-
-            private int[] CalculateLineStartsOptimized(string text)
-            {
-                // Preallocate based on estimation (assume average line length of 40 chars)
-                int estimatedLineCount = Math.Max(10, text.Length / 40);
-                var lineStarts = new List<int>(estimatedLineCount) { 0 }; // First line starts at index 0
-
-                for (int i = 0; i < text.Length; i++)
-                {
-                    char c = text[i];
-                    if (c == '\n')
-                    {
-                        lineStarts.Add(i + 1); // Next line starts after the newline
-                    }
-                    else if (c == '\r')
-                    {
-                        // Handle \r\n sequence
-                        if (i + 1 < text.Length && text[i + 1] == '\n')
-                        {
-                            i++; // Skip the \n part
-                        }
-                        lineStarts.Add(i + 1);
-                    }
-                }
-
-                return lineStarts.ToArray();
-            }
-
-            private int BinarySearchLineStart(int position)
-            {
-                int low = 0;
-                int high = _lineStarts.Length - 1;
-
-                while (low <= high)
-                {
-                    int mid = low + (high - low) / 2;
-
-                    if (mid == _lineStarts.Length - 1 ||
-                        (position >= _lineStarts[mid] && position < _lineStarts[mid + 1]))
-                    {
-                        return mid;
-                    }
-
-                    if (position < _lineStarts[mid])
-                    {
-                        high = mid - 1;
-                    }
-                    else
-                    {
-                        low = mid + 1;
-                    }
-                }
-
-                return 0; // Fallback
             }
         }
 
@@ -646,6 +780,9 @@ namespace MarathonTranspiler.LSP
                 { "null", SemanticTokenType.Type },
                 { "boolean", SemanticTokenType.Type },
                 { "predefined-type", SemanticTokenType.Type },
+                { "xml name", SemanticTokenType.Type },
+
+                { "xml attribute", SemanticTokenType.Property },
 
                 { "variable", SemanticTokenType.Variable },
                 { "variablename", SemanticTokenType.Variable },

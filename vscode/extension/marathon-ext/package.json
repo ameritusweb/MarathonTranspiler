@@ -49,46 +49,54 @@
     }
   ],
     "semanticTokenTypes": [
-    {
-      "id": "keyword", 
-      "superType": "keyword",
-      "description": "Language keywords"
-    },
-    {
-      "id": "function",
-      "superType": "function", 
-      "description": "Function and method declarations"
-    },
-    {
-      "id": "variable",
-      "superType": "variable",
-      "description": "Variables and fields"
-    },
-    {
-      "id": "string",
-      "superType": "string",
-      "description": "String literals"
-    },
-    {
-      "id": "comment",
-      "superType": "comment",
-      "description": "Comments"
-    },
-    {
-      "id": "class",
-      "superType": "class",
-      "description": "Class, interface and enum declarations"
-    },
-    {
-      "id": "number",
-      "superType": "number",
-      "description": "Numeric literals"
-    },
-    {
-      "id": "parameter",
-      "superType": "parameter",
-      "description": "Function parameters"
-    }
+      {
+        "id": "keyword", 
+        "description": "Language keywords"
+      },
+      {
+        "id": "type", 
+        "superType": "keyword",
+        "description": "Language types"
+      },
+      {
+        "id": "property", 
+        "superType": "type",
+        "description": "Language properties"
+      },
+      {
+        "id": "function",
+        "superType": "keyword",
+        "description": "Function and method declarations"
+      },
+      {
+        "id": "variable",
+        "superType": "type",
+        "description": "Variables and fields"
+      },
+      {
+        "id": "string",
+        "superType": "type",
+        "description": "String literals"
+      },
+      {
+        "id": "comment",
+        "description": "Comments"
+      },
+      {
+        "id": "class",
+        "superType": "type",
+        "description": "Class, interface and enum declarations"
+      },
+      {
+        "id": "number",
+        "superType": "type",
+        "description": "Numeric literals"
+      },
+      {
+        "id": "parameter",
+        "superType": "variable",
+        "description": "Function parameters"
+      }
   ],
   "semanticTokenModifiers": [
     {

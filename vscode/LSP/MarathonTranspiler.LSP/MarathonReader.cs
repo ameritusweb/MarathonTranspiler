@@ -17,6 +17,7 @@ namespace MarathonTranspiler.LSP
             var annotatedCodes = new List<AnnotatedCode>();
             var currentAnnotation = new Annotation();
             var currentCode = new List<string>();
+            var currentUntrimmedCode = new List<string>();
             var currentBlock = new AnnotatedCode();
 
             foreach (var line in lines)
@@ -25,7 +26,10 @@ namespace MarathonTranspiler.LSP
 
                 // Skip empty lines
                 if (string.IsNullOrWhiteSpace(trimmedLine))
+                {
+                    currentUntrimmedCode.Add(line);
                     continue;
+                }
 
                 var annotationMatch = AnnotationRegex.Match(trimmedLine);
                 if (annotationMatch.Success)
@@ -34,11 +38,17 @@ namespace MarathonTranspiler.LSP
                     if (currentCode.Count > 0)
                     {
                         currentBlock.Code = new List<string>(currentCode);
+                        currentBlock.RawCode = new List<string>(currentUntrimmedCode);
                         annotatedCodes.Add(currentBlock);
 
                         // Reset for new block
                         currentBlock = new AnnotatedCode();
                         currentCode.Clear();
+                        currentUntrimmedCode.Clear();
+                    }
+                    else if (currentUntrimmedCode.Count > 0)
+                    {
+                        currentUntrimmedCode.Clear();
                     }
 
                     // Parse the annotation
@@ -65,6 +75,7 @@ namespace MarathonTranspiler.LSP
                 {
                     // Add code line
                     currentCode.Add(trimmedLine);
+                    currentUntrimmedCode.Add(line);
                 }
             }
 
@@ -72,6 +83,7 @@ namespace MarathonTranspiler.LSP
             if (currentCode.Count > 0)
             {
                 currentBlock.Code = new List<string>(currentCode);
+                currentBlock.RawCode = new List<string>(currentUntrimmedCode);
                 annotatedCodes.Add(currentBlock);
             }
 

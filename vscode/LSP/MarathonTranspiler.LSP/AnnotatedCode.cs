@@ -11,5 +11,7 @@ namespace MarathonTranspiler.LSP
         public List<Annotation> Annotations { get; set; } = new List<Annotation>();
 
         public List<string> Code { get; set; } = new List<string>();
+
+        public List<string> RawCode { get; set; } = new List<string>();
     }
 }

@@ -17,7 +17,7 @@ namespace MarathonTranspiler.LSP
 
         private static readonly List<string> ValidAnnotations = new()
         {
-            "@varInit", "@run", "@more", "@condition", "@parameter", "@assert", "@domInit", "@onEvent"
+            "@varInit", "@run", "@more", "@condition", "@parameter", "@assert", "@domInit", "@onEvent", "@xml"
         };
 
         private static readonly Dictionary<string, List<string>> RequiredProperties = new()
@@ -30,6 +30,7 @@ namespace MarathonTranspiler.LSP
             { "@parameter", new List<string> { "name", "type" } },
             { "@domInit", new List<string> { "id", "parent" } },
             { "@onEvent", new List<string> { "event", "target" } },
+            { "@xml", new List<string> { } },
         };
 
         public TextDocumentHandler(Workspace workspace)
@@ -47,7 +48,7 @@ namespace MarathonTranspiler.LSP
         public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
         {
             _workspace.UpdateDocument(request.TextDocument.Uri, request.ContentChanges.FirstOrDefault().Text);
-            RunDiagnostics(request.TextDocument.Uri);
+            // RunDiagnostics(request.TextDocument.Uri);
             return Task.FromResult(Unit.Value);
         }
 

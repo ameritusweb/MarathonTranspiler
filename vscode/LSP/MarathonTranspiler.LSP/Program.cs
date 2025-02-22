@@ -12,10 +12,10 @@ namespace MarathonTranspiler.LSP
         {
             var workspace = new Workspace();
 
-            // while (!Debugger.IsAttached)
-            // {
+            //while (!Debugger.IsAttached)
+            //{
             //    await Task.Delay(100); // Keep waiting until debugger is attached
-            // }
+            //}
 
             var server = await LanguageServer.From(options =>
                 options.WithInput(Console.OpenStandardInput())
