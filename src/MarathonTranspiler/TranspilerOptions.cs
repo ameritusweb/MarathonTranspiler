@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Transpilers.CSharp;
+using MarathonTranspiler.Transpilers.FullStackWeb;
 using MarathonTranspiler.Transpilers.Orleans;
 using MarathonTranspiler.Transpilers.Python;
 using MarathonTranspiler.Transpilers.React;
@@ -36,6 +37,9 @@ namespace MarathonTranspiler
 
         [JsonPropertyName("react-redux")]
         public ReactReduxConfig ReactRedux { get; set; }
+
+        [JsonPropertyName("fullstackweb")]
+        public FullStackWebConfig FullStackWeb { get; set; }
 
         [JsonPropertyName("epf")]
         public WpfConfig Wpf { get; set; }

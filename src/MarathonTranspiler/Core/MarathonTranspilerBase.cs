@@ -44,7 +44,7 @@ namespace MarathonTranspiler.Core
             return Components[name];
         }
 
-        protected virtual void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
+        protected internal virtual void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
             var className = mainAnnotation.Values.GetValue("className", string.Empty);

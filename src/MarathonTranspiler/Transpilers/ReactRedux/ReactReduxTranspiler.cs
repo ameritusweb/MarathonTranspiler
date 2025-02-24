@@ -26,7 +26,7 @@ namespace MarathonTranspiler.Transpilers.ReactRedux
             this._config = config;
         }
 
-        protected override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
+        protected internal override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
 
