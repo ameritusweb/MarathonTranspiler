@@ -4,6 +4,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
+using System;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,15 +24,25 @@ namespace MarathonTranspiler.LSP
         private static readonly Dictionary<string, List<string>> RequiredProperties = new()
         {
             { "@varInit", new List<string> { "className", "type" } },
-            { "@run", new List<string> { "id", "className", "functionName" } },
+            { "@run", new List<string> { "className", "functionName" } },
             { "@more", new List<string> { "id" } },
             { "@condition", new List<string> { "expression" } },
-            { "@assert", new List<string> { "condition" } },
+            { "@assert", new List<string> { "className", "condition" } },
             { "@parameter", new List<string> { "name", "type" } },
-            { "@domInit", new List<string> { "id", "parent" } },
-            { "@onEvent", new List<string> { "event", "target" } },
+            { "@domInit", new List<string> { "target", "tag" } },
+            { "@onEvent", new List<string> { "className", "event", "target" } },
             { "@xml", new List<string> { } },
         };
+
+        private static readonly Dictionary<string, List<string>> OptionalProperties = new()
+        {
+            { "@parameter", new List<string> { "value" } },
+            { "@domInit", new List<string> { "class" } },
+            { "@xml", new List<string> { "pageName", "componentName" } },
+            { "@run", new List<string> { "id" } },
+        };
+
+        private int _lineCount = 0;
 
         public TextDocumentHandler(Workspace workspace)
         {
@@ -47,8 +58,15 @@ namespace MarathonTranspiler.LSP
 
         public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
         {
-            _workspace.UpdateDocument(request.TextDocument.Uri, request.ContentChanges.FirstOrDefault().Text);
-            // RunDiagnostics(request.TextDocument.Uri);
+            var uri = request.TextDocument.Uri;
+            _workspace.UpdateDocument(uri, request.ContentChanges.FirstOrDefault().Text);
+            string[] lines = _workspace.GetDocumentLines(uri);
+            if (lines.Length != _lineCount)
+            {
+                RunDiagnostics(request.TextDocument.Uri);
+            }
+
+            this._lineCount = lines.Length;
             return Task.FromResult(Unit.Value);
         }
 
@@ -108,7 +126,7 @@ namespace MarathonTranspiler.LSP
                             foreach (Match prop in propertyMatches)
                             {
                                 var propertyName = prop.Groups[1].Value;
-                                if (!RequiredProperties[annotation].Contains(propertyName))
+                                if (!RequiredProperties[annotation].Contains(propertyName) && !this.IsOptional(annotation, propertyName))
                                 {
                                     diagnostics.Add(new Diagnostic
                                     {
@@ -136,6 +154,11 @@ namespace MarathonTranspiler.LSP
 
             // 🔹 **Send diagnostics via the workspace**
             _workspace.SendDiagnostics(uri, diagnostics);
+        }
+
+        private bool IsOptional(string annotation, string property)
+        {
+            return OptionalProperties.ContainsKey(annotation) && OptionalProperties[annotation].Contains(property);
         }
 
         protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(TextSynchronizationCapability capability, ClientCapabilities clientCapabilities)

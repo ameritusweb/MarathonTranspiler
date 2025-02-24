@@ -32,11 +32,11 @@ namespace MarathonTranspiler.LSP
                 Kind = CompletionItemKind.Snippet,
                 InsertTextFormat = InsertTextFormat.Snippet,
                 // Remove @ from InsertText to prevent duplication
-                InsertText = "domInit(id=\"${1:Id}\", parent=\"${2:Parent}\")\n<${3:Tag}>",
+                InsertText = "domInit(target=\"${1:Target}\", tag=\"${2:Tag}\", class=\"${2:Class}\")\n",
                 Documentation = new MarkupContent
                 {
                     Kind = MarkupKind.Markdown,
-                    Value = "Initialize a DOM element with an ID and parent."
+                    Value = "Initialize a DOM element from an XML structure."
                 }
             },
             new CompletionItem
@@ -58,7 +58,7 @@ namespace MarathonTranspiler.LSP
                 Kind = CompletionItemKind.Snippet,
                 InsertTextFormat = InsertTextFormat.Snippet,
                 // Remove @ from InsertText to prevent duplication
-                InsertText = "onEvent(event=\"${1:Event}\", target=\"${2:Target}\")\n${3:// Code to execute in response}",
+                InsertText = "onEvent(className=\"${1:ClassName}\", event=\"${2:Event}\", target=\"${3:Target}\")\n${4:// Code to execute in response}",
                 Documentation = new MarkupContent
                 {
                     Kind = MarkupKind.Markdown,
@@ -116,6 +116,26 @@ namespace MarathonTranspiler.LSP
                         Kind = CompletionItemKind.Property,
                         InsertTextFormat = InsertTextFormat.Snippet,
                         InsertText = "className=\"${1:ClassName}\""
+                    }
+                }
+            },
+            { "pageName", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "pageName",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "pageName=\"${1:PageName}\""
+                    }
+                }
+            },
+            { "componentName", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "componentName",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "componentName=\"${1:ComponentName}\""
                     }
                 }
             },
@@ -199,6 +219,26 @@ namespace MarathonTranspiler.LSP
                     }
                 }
             },
+            { "tag", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "tag",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "tag=\"${1:Tag}\""
+                    }
+                }
+            },
+            { "class", new List<CompletionItem>
+                {
+                    new CompletionItem {
+                        Label = "class",
+                        Kind = CompletionItemKind.Property,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = "class=\"${1:Class}\""
+                    }
+                }
+            },
             { "condition", new List<CompletionItem>
                 {
                     new CompletionItem {
@@ -267,10 +307,12 @@ namespace MarathonTranspiler.LSP
                 }
                 else if (annotationType == "@domInit")
                 {
-                    if (!existingParams.Contains("id"))
-                        parameterList.AddRange(ParameterSnippets["id"]);
-                    if (!existingParams.Contains("parent"))
-                        parameterList.AddRange(ParameterSnippets["parent"]);
+                    if (!existingParams.Contains("target"))
+                        parameterList.AddRange(ParameterSnippets["target"]);
+                    if (!existingParams.Contains("tag"))
+                        parameterList.AddRange(ParameterSnippets["tag"]);
+                    if (!existingParams.Contains("class"))
+                        parameterList.AddRange(ParameterSnippets["class"]);
                 }
                 else if (annotationType == "@parameter")
                 {
@@ -281,6 +323,8 @@ namespace MarathonTranspiler.LSP
                 }
                 else if (annotationType == "@onEvent")
                 {
+                    if (!existingParams.Contains("className"))
+                        parameterList.AddRange(ParameterSnippets["className"]);
                     if (!existingParams.Contains("event"))
                         parameterList.AddRange(ParameterSnippets["event"]);
                     if (!existingParams.Contains("target"))
@@ -328,6 +372,13 @@ namespace MarathonTranspiler.LSP
                         parameterList.AddRange(ParameterSnippets["className"]);
                     if (!existingParams.Contains("condition"))
                         parameterList.AddRange(ParameterSnippets["condition"]);
+                }
+                else if (annotationType == "@xml")
+                {
+                    if (!existingParams.Contains("pageName"))
+                        parameterList.AddRange(ParameterSnippets["pageName"]);
+                    if (!existingParams.Contains("componentName"))
+                        parameterList.AddRange(ParameterSnippets["componentName"]);
                 }
 
                 return Task.FromResult(new CompletionList(parameterList));
