@@ -38,7 +38,7 @@ namespace MarathonTranspiler.Transpilers.Wpf
             this._config = config;
         }
 
-        protected override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
+        protected internal override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
             var className = mainAnnotation.Values.First(v => v.Key == "className").Value;

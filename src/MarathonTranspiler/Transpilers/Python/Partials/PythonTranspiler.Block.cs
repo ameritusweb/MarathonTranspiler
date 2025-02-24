@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,7 @@ namespace MarathonTranspiler.Transpilers.Python
 {
     public partial class PythonTranspiler : MarathonTranspilerBase
     {
-        protected override void ProcessBlock(AnnotatedCode block, AnnotatedCode previousBlock)
+        protected internal override void ProcessBlock(AnnotatedCode block, AnnotatedCode previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
             var className = mainAnnotation.Values.First(v => v.Key == "className").Value;

@@ -15,7 +15,7 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
         private readonly Dictionary<string, ControllerInfo> _controllers = new();
         private readonly Dictionary<string, ModelInfo> _models = new();
 
-        protected override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
+        protected internal override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var annotation = block.Annotations[0];
 

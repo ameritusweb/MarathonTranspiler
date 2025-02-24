@@ -14,6 +14,14 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
         private readonly Dictionary<string, ModelInfo> _models = new();
         private readonly Dictionary<string, List<Relationship>> _relationships = new();
 
+        public Dictionary<string, ModelInfo> Models
+        {
+            get
+            {
+                return _models;
+            }
+        }
+
         public class ModelInfo
         {
             public string Name { get; set; }
