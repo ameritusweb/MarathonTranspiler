@@ -8,6 +8,7 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
 {
     public enum TranspilerContext
     {
+        React,
         ReactRedux,
         AspNetCoreMvc
     }

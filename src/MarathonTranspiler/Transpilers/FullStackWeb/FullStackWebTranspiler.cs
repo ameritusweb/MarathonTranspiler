@@ -1,5 +1,6 @@
 ﻿using MarathonTranspiler.Core;
 using MarathonTranspiler.Extensions;
+using MarathonTranspiler.Transpilers.React;
 using MarathonTranspiler.Transpilers.ReactRedux;
 using System;
 using System.Collections.Generic;
@@ -12,7 +13,8 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
     public class FullStackWebTranspiler : MarathonTranspilerBase
     {
         private TranspilerContext _currentContext = TranspilerContext.ReactRedux;
-        private readonly ReactReduxTranspiler _reactTranspiler;
+        private readonly ReactTranspiler _reactTranspiler;
+        private readonly ReactReduxTranspiler _reactReduxTranspiler;
         private readonly AspNetTranspiler _aspNetTranspiler;
         private readonly ModelRelationshipHandler _modelHandler = new();
         private readonly ReduxRelationshipHandler _reduxHandler = new();
@@ -21,6 +23,9 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
         public FullStackWebTranspiler(FullStackWebConfig config)
         {
             this._config = config;
+            _reactReduxTranspiler = new ReactReduxTranspiler(config.Redux);
+            _reactTranspiler = new ReactTranspiler(config.React);
+            _aspNetTranspiler = new AspNetTranspiler(config.Backend);
         }
 
         protected internal override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
@@ -31,6 +36,7 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
             {
                 _currentContext = mainAnnotation.Values.GetValue("type").ToLower() switch
                 {
+                    "react" => TranspilerContext.React,
                     "reactredux" => TranspilerContext.ReactRedux,
                     "aspnetcoremvc" => TranspilerContext.AspNetCoreMvc,
                     _ => _currentContext
@@ -55,6 +61,10 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
                     {
                         _reduxHandler.ProcessAsyncOperation(block);
                     }
+                    _reactReduxTranspiler.ProcessBlock(block, previousBlock);
+                    break;
+
+                case TranspilerContext.React:
                     _reactTranspiler.ProcessBlock(block, previousBlock);
                     break;
 
@@ -70,27 +80,37 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
             var sb = new StringBuilder();
 
             // Generate backend code first
-            foreach (var model in _modelHandler.Models.Values)
+            if (_aspNetTranspiler.HasContent)
             {
-                var dbContextSb = new StringBuilder();
-                _modelHandler.GenerateDbContext(dbContextSb);
-                sb.AppendLine($"// {_config.Backend.DbContextName}.cs");
-                sb.AppendLine(dbContextSb.ToString());
-                sb.AppendLine();
+                foreach (var model in _modelHandler.Models.Values)
+                {
+                    var dbContextSb = new StringBuilder();
+                    _modelHandler.GenerateDbContext(dbContextSb);
+                    sb.AppendLine($"// {_config.Backend.DbContextName}.cs");
+                    sb.AppendLine(dbContextSb.ToString());
+                    sb.AppendLine();
+                }
+                sb.AppendLine(_aspNetTranspiler.GenerateOutput());
             }
-            sb.AppendLine(_aspNetTranspiler.GenerateOutput());
 
-            // Then generate frontend code with relationship awareness
-            foreach (var model in _modelHandler.Models.Values)
+            if (_currentContext == TranspilerContext.ReactRedux)
             {
-                var storeName = $"{model.Name}Store";
-                var storeSb = new StringBuilder();
-                _reduxHandler.GenerateReduxSlice(storeSb, storeName);
-                sb.AppendLine($"// {storeName.ToLower()}.ts");
-                sb.AppendLine(storeSb.ToString());
-                sb.AppendLine();
+                // Then generate frontend code with relationship awareness
+                foreach (var model in _modelHandler.Models.Values)
+                {
+                    var storeName = $"{model.Name}Store";
+                    var storeSb = new StringBuilder();
+                    _reduxHandler.GenerateReduxSlice(storeSb, storeName);
+                    sb.AppendLine($"// {storeName.ToLower()}.ts");
+                    sb.AppendLine(storeSb.ToString());
+                    sb.AppendLine();
+                }
+                sb.AppendLine(_reactReduxTranspiler.GenerateOutput());
             }
-            sb.AppendLine(_reactTranspiler.GenerateOutput());
+            else if (_currentContext == TranspilerContext.React)
+            {
+                sb.AppendLine(_reactTranspiler.GenerateOutput());
+            }
 
             return sb.ToString();
         }

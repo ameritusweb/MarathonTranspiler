@@ -1,4 +1,5 @@
-﻿using MarathonTranspiler.Transpilers.ReactRedux;
+﻿using MarathonTranspiler.Transpilers.React;
+using MarathonTranspiler.Transpilers.ReactRedux;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +14,10 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
         [JsonPropertyName("backend")]
         public AspNetConfig Backend { get; set; } = new();
 
-        [JsonPropertyName("frontend")]
-        public ReactReduxConfig Frontend { get; set; } = new();
+        [JsonPropertyName("redux")]
+        public ReactReduxConfig Redux { get; set; } = new();
+
+        [JsonPropertyName("react")]
+        public ReactConfig React { get; set; } = new();
     }
 }
