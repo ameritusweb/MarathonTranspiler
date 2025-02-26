@@ -104,6 +104,18 @@ namespace MarathonTranspiler.LSP
                     Value = "Declare a parameter to the function."
                 }
             },
+            new CompletionItem
+            {
+                Label = "@varInit (nested class)",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                InsertText = "varInit(className=\"${1:ClassName}\", type=[ { name=\"${2:PropName}\", type=\"${3:string}\" }, { name=\"${4:PropName2}\", type=\"${5:string}\" } ])",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Define a nested class with properties inside a method."
+                }
+            }
         };
 
         // Parameter snippets remain unchanged
@@ -271,6 +283,50 @@ namespace MarathonTranspiler.LSP
                 return Task.FromResult(new CompletionList());
 
             var linePrefix = position.Character > 0 ? line.Substring(0, position.Character) : string.Empty;
+
+            // Check if we're inside a run block (by checking previous lines)
+            bool insideRunBlock = false;
+            for (int i = position.Line - 1; i >= 0 && i >= position.Line - 10; i--)
+            {
+                if (lines[i].TrimStart().StartsWith("@run"))
+                {
+                    insideRunBlock = true;
+                    break;
+                }
+
+                // If we hit a blank line or code that's not an annotation, stop looking
+                if (string.IsNullOrWhiteSpace(lines[i]) ||
+                    (!lines[i].TrimStart().StartsWith("@") && !lines[i].TrimStart().StartsWith("//")))
+                {
+                    break;
+                }
+            }
+
+            // Add specialized completions for inside run blocks
+            if (insideRunBlock && (position.Character == 0 ||
+               (position.Character > 0 && linePrefix.EndsWith("@"))))
+            {
+                var completions = new List<CompletionItem>();
+
+                // Include standard snippets
+                completions.AddRange(GetContextualSnippets(lines));
+
+                // Add nested class snippets when inside a run block
+                completions.Add(new CompletionItem
+                {
+                    Label = "@varInit (nested class)",
+                    Kind = CompletionItemKind.Snippet,
+                    InsertTextFormat = InsertTextFormat.Snippet,
+                    InsertText = "varInit(className=\"${1:ClassName}\", type=[ { name=\"${2:PropName}\", type=\"${3:string}\" }, { name=\"${4:PropName2}\", type=\"${5:string}\" } ])",
+                    Documentation = new MarkupContent
+                    {
+                        Kind = MarkupKind.Markdown,
+                        Value = "Define a nested class with properties inside a method."
+                    }
+                });
+
+                return Task.FromResult(new CompletionList(completions));
+            }
 
             // If at start of line or after @, suggest annotation snippets
             if (position.Character == 0 ||

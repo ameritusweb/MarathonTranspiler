@@ -82,6 +82,9 @@ namespace MarathonTranspiler.LSP
             var lines = _workspace.GetDocumentLines(uri);
             if (lines == null) return;
 
+            bool insideRunBlock = false;
+            string currentClassName = "";
+
             for (int i = 0; i < lines.Length; i++)
             {
                 var line = lines[i].Trim();
@@ -94,6 +97,24 @@ namespace MarathonTranspiler.LSP
                         var annotation = "@" + match.Groups[1].Value;
                         var properties = match.Groups[3].Value;
 
+                        // Track when we enter/exit a run block
+                        if (annotation == "@run")
+                        {
+                            insideRunBlock = true;
+
+                            // Extract className for context
+                            var classNameMatch = Regex.Match(properties, @"className=""([^""]+)""");
+                            if (classNameMatch.Success)
+                            {
+                                currentClassName = classNameMatch.Groups[1].Value;
+                            }
+                        }
+                        else if (insideRunBlock && line.Contains("var ") && !line.Contains("@"))
+                        {
+                            // We've reached code inside the run block
+                            insideRunBlock = false;
+                        }
+
                         // 1️⃣ **Check if annotation is valid**
                         if (!ValidAnnotations.Contains(annotation))
                         {
@@ -104,9 +125,59 @@ namespace MarathonTranspiler.LSP
                                 Severity = DiagnosticSeverity.Error
                             });
                         }
+                        // Special handling for nested varInit inside run blocks
+                        else if (annotation == "@varInit" && insideRunBlock)
+                        {
+                            // Check if this is a type definition with array syntax
+                            var typeMatch = Regex.Match(properties, @"type=\[(.*?)\]");
+                            if (typeMatch.Success)
+                            {
+                                var typeContent = typeMatch.Groups[1].Value;
+
+                                // Validate that the type content has valid property definitions
+                                if (!ValidatePropertyDefinitions(typeContent))
+                                {
+                                    diagnostics.Add(new Diagnostic
+                                    {
+                                        Range = new Range(new Position(i, properties.IndexOf("type=")),
+                                                        new Position(i, properties.IndexOf("type=") + 5 + typeContent.Length + 2)),
+                                        Message = "Invalid property definition array. Format should be: [ { name=\"PropName\", type=\"PropType\" }, ... ]",
+                                        Severity = DiagnosticSeverity.Error
+                                    });
+                                }
+
+                                // Also check that className is different from the run block's className
+                                var classNameMatch = Regex.Match(properties, @"className=""([^""]+)""");
+                                if (classNameMatch.Success && classNameMatch.Groups[1].Value == currentClassName)
+                                {
+                                    diagnostics.Add(new Diagnostic
+                                    {
+                                        Range = new Range(new Position(i, properties.IndexOf("className=")),
+                                                         new Position(i, properties.IndexOf("className=") + 10 + currentClassName.Length + 2)),
+                                        Message = "Nested class definition should have a different class name than the containing method",
+                                        Severity = DiagnosticSeverity.Warning
+                                    });
+                                }
+                            }
+
+                            // For regular varInit checks, still validate required properties
+                            var missingProperties = RequiredProperties[annotation]
+                                .Where(p => !properties.Contains(p + "="))
+                                .ToList();
+
+                            if (missingProperties.Any())
+                            {
+                                diagnostics.Add(new Diagnostic
+                                {
+                                    Range = new Range(new Position(i, 0), new Position(i, line.Length)),
+                                    Message = $"Missing required properties: {string.Join(", ", missingProperties)}",
+                                    Severity = DiagnosticSeverity.Warning
+                                });
+                            }
+                        }
                         else
                         {
-                            // 2️⃣ **Check for required properties**
+                            // Standard property validation for other annotation types
                             var missingProperties = RequiredProperties[annotation]
                                 .Where(p => !properties.Contains(p + "="))
                                 .ToList();
@@ -154,6 +225,16 @@ namespace MarathonTranspiler.LSP
 
             // 🔹 **Send diagnostics via the workspace**
             _workspace.SendDiagnostics(uri, diagnostics);
+        }
+
+        private bool ValidatePropertyDefinitions(string content)
+        {
+            // Simple regex check for the expected pattern
+            var pattern = @"\{\s*name\s*=\s*""[^""]+""s*,\s*type\s*=\s*""[^""]+""s*\}";
+            var matches = Regex.Matches(content, pattern);
+
+            // Allow a more lenient check by just ensuring we have at least one property with name and type
+            return content.Contains("name=") && content.Contains("type=");
         }
 
         private bool IsOptional(string annotation, string property)

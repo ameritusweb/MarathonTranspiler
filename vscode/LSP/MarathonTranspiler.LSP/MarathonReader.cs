@@ -12,6 +12,9 @@ namespace MarathonTranspiler.LSP
         private static readonly Regex AnnotationRegex = new(@"^@(\w+)\((.*)\)$");
         private static readonly Regex KeyValueRegex = new(@"(\w+)=""([^""]*)"",?");
 
+        // New regex for complex type array syntax in varInit
+        private static readonly Regex TypeArrayRegex = new(@"type=(\[.*?\])");
+
         public List<AnnotatedCode> ParseFile(List<string> lines)
         {
             var annotatedCodes = new List<AnnotatedCode>();
@@ -60,13 +63,57 @@ namespace MarathonTranspiler.LSP
 
                     // Parse key-value pairs
                     var keyValueContent = annotationMatch.Groups[2].Value;
-                    var keyValueMatches = KeyValueRegex.Matches(keyValueContent);
 
-                    foreach (Match kvMatch in keyValueMatches)
+                    if (currentAnnotation.Name == "varInit")
                     {
-                        var key = kvMatch.Groups[1].Value;
-                        var value = kvMatch.Groups[2].Value;
-                        currentAnnotation.Values.Add(new KeyValuePair<string, string>(key, value));
+                        var typeArrayMatch = TypeArrayRegex.Match(keyValueContent);
+                        if (typeArrayMatch.Success)
+                        {
+                            // Extract the array content
+                            var arrayContent = typeArrayMatch.Groups[1].Value;
+
+                            // Add the type array as a value
+                            currentAnnotation.Values.Add(new KeyValuePair<string, string>("type", arrayContent));
+
+                            // Remove the type array from the content so we can parse other key-value pairs
+                            keyValueContent = TypeArrayRegex.Replace(keyValueContent, "");
+
+                            // Parse remaining standard key-value pairs
+                            var keyValueMatches = KeyValueRegex.Matches(keyValueContent);
+                            foreach (Match kvMatch in keyValueMatches)
+                            {
+                                var key = kvMatch.Groups[1].Value;
+                                var value = kvMatch.Groups[2].Value;
+
+                                // Skip type key since we already processed it
+                                if (key != "type")
+                                {
+                                    currentAnnotation.Values.Add(new KeyValuePair<string, string>(key, value));
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Standard key-value parsing for regular varInit
+                            var keyValueMatches = KeyValueRegex.Matches(keyValueContent);
+                            foreach (Match kvMatch in keyValueMatches)
+                            {
+                                var key = kvMatch.Groups[1].Value;
+                                var value = kvMatch.Groups[2].Value;
+                                currentAnnotation.Values.Add(new KeyValuePair<string, string>(key, value));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var keyValueMatches = KeyValueRegex.Matches(keyValueContent);
+
+                        foreach (Match kvMatch in keyValueMatches)
+                        {
+                            var key = kvMatch.Groups[1].Value;
+                            var value = kvMatch.Groups[2].Value;
+                            currentAnnotation.Values.Add(new KeyValuePair<string, string>(key, value));
+                        }
                     }
 
                     currentBlock.Annotations.Add(currentAnnotation);

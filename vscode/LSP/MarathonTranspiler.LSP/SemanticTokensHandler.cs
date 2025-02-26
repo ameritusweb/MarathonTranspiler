@@ -15,6 +15,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using MediatR.Pipeline;
 using System.Runtime.Serialization;
+using System.Text.RegularExpressions;
 
 namespace MarathonTranspiler.LSP
 {
@@ -569,9 +570,137 @@ namespace MarathonTranspiler.LSP
                 );
             }
 
+            // Special handling for type arrays in varInit annotations
+            if (annotation.Name == "varInit")
+            {
+                var typeValue = annotation.Values.FirstOrDefault(v => v.Key == "type").Value;
+                if (typeValue != null && typeValue.StartsWith("[") && typeValue.EndsWith("]"))
+                {
+                    // Find the position of the type value in the line
+                    string typePattern = $"type=\\[{Regex.Escape(typeValue.Substring(1, typeValue.Length - 2))}\\]";
+                    var typeMatch = Regex.Match(line, typePattern);
+
+                    if (typeMatch.Success)
+                    {
+                        int typeStartIndex = typeMatch.Index + 5; // "type=".Length
+
+                        // Highlight the array brackets
+                        builder.Push(
+                            lineNumber,
+                            typeStartIndex,
+                            1, // Opening bracket
+                            SemanticTokenType.Operator,
+                            SemanticTokenModifier.Defaults
+                        );
+
+                        builder.Push(
+                            lineNumber,
+                            typeStartIndex + typeValue.Length - 1,
+                            1, // Closing bracket
+                            SemanticTokenType.Operator,
+                            SemanticTokenModifier.Defaults
+                        );
+
+                        // Highlight the property definitions
+                        var propertyPattern = @"\{\s*name\s*=\s*""([^""]+)""\s*,\s*type\s*=\s*""([^""]+)""\s*\}";
+                        var propertyMatches = Regex.Matches(typeValue, propertyPattern);
+
+                        foreach (Match propMatch in propertyMatches)
+                        {
+                            // Highlight property object braces
+                            int propStartPos = line.IndexOf(propMatch.Value, typeStartIndex);
+                            if (propStartPos >= 0)
+                            {
+                                // Opening brace
+                                builder.Push(
+                                    lineNumber,
+                                    propStartPos,
+                                    1,
+                                    SemanticTokenType.Operator,
+                                    SemanticTokenModifier.Defaults
+                                );
+
+                                // Closing brace
+                                builder.Push(
+                                    lineNumber,
+                                    propStartPos + propMatch.Value.Length - 1,
+                                    1,
+                                    SemanticTokenType.Operator,
+                                    SemanticTokenModifier.Defaults
+                                );
+
+                                // Highlight "name" and "type" keywords
+                                var nameKeywordPos = line.IndexOf("name", propStartPos);
+                                if (nameKeywordPos >= 0)
+                                {
+                                    builder.Push(
+                                        lineNumber,
+                                        nameKeywordPos,
+                                        4, // "name".Length
+                                        SemanticTokenType.Parameter,
+                                        SemanticTokenModifier.Defaults
+                                    );
+                                }
+
+                                var typeKeywordPos = line.IndexOf("type", propStartPos + 5); // Skip the "name" part
+                                if (typeKeywordPos >= 0)
+                                {
+                                    builder.Push(
+                                        lineNumber,
+                                        typeKeywordPos,
+                                        4, // "type".Length
+                                        SemanticTokenType.Parameter,
+                                        SemanticTokenModifier.Defaults
+                                    );
+                                }
+
+                                // Highlight property name value
+                                if (propMatch.Groups.Count > 1)
+                                {
+                                    var propNameValue = propMatch.Groups[1].Value;
+                                    var propNamePos = line.IndexOf(propNameValue, nameKeywordPos);
+                                    if (propNamePos >= 0)
+                                    {
+                                        builder.Push(
+                                            lineNumber,
+                                            propNamePos,
+                                            propNameValue.Length,
+                                            SemanticTokenType.String,
+                                            SemanticTokenModifier.Defaults
+                                        );
+                                    }
+                                }
+
+                                // Highlight property type value
+                                if (propMatch.Groups.Count > 2)
+                                {
+                                    var propTypeValue = propMatch.Groups[2].Value;
+                                    var propTypePos = line.IndexOf(propTypeValue, typeKeywordPos);
+                                    if (propTypePos >= 0)
+                                    {
+                                        builder.Push(
+                                            lineNumber,
+                                            propTypePos,
+                                            propTypeValue.Length,
+                                            SemanticTokenType.String,
+                                            SemanticTokenModifier.Defaults
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+
             // Highlight the key-value pairs
             foreach (var kvp in annotation.Values)
             {
+                // Skip the type property if it's an array (we handled it above)
+                if (kvp.Key == "type" && kvp.Value.StartsWith("[") && kvp.Value.EndsWith("]"))
+                    continue;
+
                 // Find and highlight the key
                 int keyIndex = line.IndexOf(kvp.Key, annotationStart);
                 if (keyIndex >= 0)

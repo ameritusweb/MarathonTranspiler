@@ -14,7 +14,7 @@ namespace MarathonTranspiler.LSP
 
         private static readonly Dictionary<string, string> AnnotationDocumentation = new()
         {
-            { "@varInit", "Initializes a variable with the specified class and type.\n\n**Required properties:**\n- `className`: The class where this variable is defined\n- `type`: The data type of the variable" },
+            { "@varInit", "Initializes a variable with the specified class and type.\n\n**Required properties:**\n- `className`: The class where this variable is defined\n- `type`: The data type of the variable\n\n**When used inside a @run block:**\n- Can define nested classes with properties using array syntax: `type=[ { name=\"PropName\", type=\"string\" }, ... ]`" },
             { "@run", "Executes code within the context of a specific class and function.\n\n**Required properties:**\n- `id`: Unique identifier for this execution block\n- `className`: The class where this function is defined\n- `functionName`: The function to execute" },
             { "@more", "Adds additional code to an existing execution block.\n\n**Required properties:**\n- `id`: The identifier of the execution block to extend" },
             { "@condition", "Defines a conditional expression.\n\n**Required properties:**\n- `expression`: The boolean expression to evaluate" }
