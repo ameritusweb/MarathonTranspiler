@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace MarathonTranspiler.Transpilers.CSharp
@@ -30,6 +32,11 @@ namespace MarathonTranspiler.Transpilers.CSharp
                         method.Parameters.Add(param);
                     }
                 }
+                else if (paramAnnotation.Name == "varInit")
+                {
+                    // Process inline class definition (varInit with type array)
+                    ProcessNestedVarInit(paramAnnotation, method);
+                }
             }
 
             method.Id = annotation.Values.GetValue("id");
@@ -46,6 +53,70 @@ namespace MarathonTranspiler.Transpilers.CSharp
 
                 var instanceName = char.ToLower(currentClass.ClassName[0]) + currentClass.ClassName.Substring(1);
                 _mainMethodLines.Add($"{instanceName}.{functionName}({string.Join(", ", paramValues)});");
+            }
+        }
+
+        private void ProcessNestedVarInit(Annotation annotation, TranspiledMethod method)
+        {
+            var className = annotation.Values.First(v => v.Key == "className").Value;
+
+            // Check if the type contains an array of properties
+            var typeValue = annotation.Values.First(v => v.Key == "type").Value;
+            if (typeValue.StartsWith("[") && typeValue.EndsWith("]"))
+            {
+                // Create or get the class
+                if (!_classes.ContainsKey(className))
+                {
+                    _classes[className] = new TranspiledClass { ClassName = className };
+                }
+
+                var targetClass = _classes[className];
+
+                try
+                {
+                    // Parse the JSON array of properties
+                    var properties = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(typeValue);
+
+                    if (properties != null)
+                    {
+                        foreach (var property in properties)
+                        {
+                            if (property.TryGetValue("name", out var propName) &&
+                                property.TryGetValue("type", out var propType))
+                            {
+                                targetClass.Properties.Add(new TranspiledProperty
+                                {
+                                    Name = propName,
+                                    Type = propType
+                                });
+                            }
+                        }
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    // Add a comment to the method about the parsing failure
+                    method.Code.Add($"// Failed to parse properties for {className}: {ex.Message}");
+
+                    // Manual parsing as fallback (simplified)
+                    var propertiesPattern = @"\{\s*name\s*=\s*""([^""]+)""\s*,\s*type\s*=\s*""([^""]+)""\s*\}";
+                    var matches = Regex.Matches(typeValue, propertiesPattern);
+
+                    foreach (Match match in matches)
+                    {
+                        if (match.Groups.Count >= 3)
+                        {
+                            var propName = match.Groups[1].Value;
+                            var propType = match.Groups[2].Value;
+
+                            targetClass.Properties.Add(new TranspiledProperty
+                            {
+                                Name = propName,
+                                Type = propType
+                            });
+                        }
+                    }
+                }
             }
         }
 
