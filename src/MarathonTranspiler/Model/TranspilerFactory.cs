@@ -30,5 +30,25 @@ namespace MarathonTranspiler.Model
                 _ => throw new ArgumentException($"Unsupported target: {options.Target}")
             };
         }
+
+        public static void ProcessAnnotatedCode(MarathonTranspilerBase transpiler, List<AnnotatedCode> annotatedCodes, bool validateFlows = true)
+        {
+            // Optional validation step
+            if (validateFlows)
+            {
+                var validationErrors = FlowValidator.ValidateFlowReferences(annotatedCodes);
+                if (validationErrors.Any())
+                {
+                    foreach (var error in validationErrors)
+                    {
+                        Console.Error.WriteLine(error);
+                    }
+                    throw new Exception("Flow validation failed. See error messages for details.");
+                }
+            }
+
+            // Process the code
+            transpiler.ProcessAnnotatedCode(annotatedCodes);
+        }
     }
 }

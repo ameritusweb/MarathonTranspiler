@@ -33,7 +33,10 @@ namespace MarathonTranspiler.Transpilers.CSharp
             }
 
             method.Id = annotation.Values.GetValue("id");
-            method.Code.AddRange(block.Code);
+
+            // Process the code for special control flow syntax before adding it to the method
+            var processedCode = ProcessControlFlowSyntax(block.Code, functionName, currentClass);
+            method.Code.AddRange(processedCode);
 
             if (!annotation.Values.Any(v => v.Key == "enumerableStart" || v.Key == "enumerableEnd"))
             {

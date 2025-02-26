@@ -33,6 +33,9 @@ namespace MarathonTranspiler.Transpilers.CSharp
 
             if (method != null && insertIndex != -1)
             {
+                // Process the code for control flow syntax before inserting
+                var processedCode = ProcessControlFlowSyntax(block.Code, method.Name, currentClass);
+
                 if (block.Annotations.Any(a => a.Name == "condition"))
                 {
                     var conditionAnnotation = block.Annotations.First(x => x.Name == "condition");
@@ -42,7 +45,7 @@ namespace MarathonTranspiler.Transpilers.CSharp
                     List<string> cblock = new List<string>();
                     cblock.Add($"if ({expression})");
                     cblock.Add("{");
-                    cblock.AddRange(block.Code.Select(line => $"\t{line}"));
+                    cblock.AddRange(processedCode.Select(line => $"\t{line}"));
                     cblock.Add("}");
 
                     // Calculate how many lines we're about to insert
@@ -67,7 +70,7 @@ namespace MarathonTranspiler.Transpilers.CSharp
                 else
                 {
                     // Adjust indexes for non-conditional inserts too
-                    int insertedLines = block.Code.Count;
+                    int insertedLines = processedCode.Count;
                     foreach (var kvp in method.IndexById.ToList())
                     {
                         if (kvp.Value >= insertIndex)
@@ -76,7 +79,7 @@ namespace MarathonTranspiler.Transpilers.CSharp
                         }
                     }
 
-                    method.Code.InsertRange(insertIndex, block.Code);
+                    method.Code.InsertRange(insertIndex, processedCode);
                 }
             }
         }

@@ -121,7 +121,7 @@ namespace MarathonTranspiler.Core
             return Components[name];
         }
 
-        protected virtual void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
+        protected internal virtual void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             var mainAnnotation = block.Annotations[0];
             var className = mainAnnotation.Values.GetValue("className", string.Empty);
@@ -319,6 +319,159 @@ namespace MarathonTranspiler.Extensions
         {
             return values.FirstOrDefault(v => v.Key == key).Value ?? defaultValue;
         }
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.AspNet
+{
+    public class ControllerInfo
+    {
+        public string Name { get; set; }
+        public List<EndpointInfo> Endpoints { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.AspNet
+{
+    public class EndpointInfo
+    {
+        public string Name { get; set; }
+        public string HttpMethod { get; set; }
+        public string Route { get; set; }
+        public List<string> Code { get; set; }
+        public List<ParameterInfo> Parameters { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.AspNet
+{
+    public class ModelInfo
+    {
+        public string Name { get; set; }
+        public List<PropertyInfo> Properties { get; set; } = new();
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.AspNet
+{
+    public enum ModelType
+    {
+        Entity,
+        Aggregate,
+        Join
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.AspNet
+{
+    public class ParameterInfo
+    {
+        public string Name { get; set; }
+        public string Type { get; set; }
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.AspNet
+{
+    public class Property
+    {
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public bool IsNavigation { get; set; }
+        public bool IsCollection { get; set; }
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.AspNet
+{
+    public class PropertyInfo
+    {
+        public string Name { get; set; }
+        public string Type { get; set; }
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.AspNet
+{
+    public class Relationship
+    {
+        public string SourceModel { get; set; }
+        public string TargetModel { get; set; }
+        public RelationType Type { get; set; }
+        public string JoinModel { get; set; }
+    }
+}
+
+/* ================================================================================ */
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MarathonTranspiler.Model.AspNet
+{
+    public enum RelationType
+    {
+        OneToOne,
+        OneToMany,
+        ManyToMany
     }
 }
 
@@ -646,7 +799,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MarathonTranspiler")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eb56f655b289ded7e81569bc1f074c5fa9649cea")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+98e8dd0055d807fc0f4692e0916a2e8d7c5f70eb")]
 [assembly: System.Reflection.AssemblyProductAttribute("MarathonTranspiler")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MarathonTranspiler")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
@@ -896,6 +1049,7 @@ namespace MarathonTranspiler.Readers
 }
 /* ================================================================================ */
 ﻿using MarathonTranspiler.Transpilers.CSharp;
+using MarathonTranspiler.Transpilers.FullStackWeb;
 using MarathonTranspiler.Transpilers.Orleans;
 using MarathonTranspiler.Transpilers.Python;
 using MarathonTranspiler.Transpilers.React;
@@ -933,6 +1087,9 @@ namespace MarathonTranspiler
 
         [JsonPropertyName("react-redux")]
         public ReactReduxConfig ReactRedux { get; set; }
+
+        [JsonPropertyName("fullstackweb")]
+        public FullStackWebConfig FullStackWeb { get; set; }
 
         [JsonPropertyName("epf")]
         public WpfConfig Wpf { get; set; }

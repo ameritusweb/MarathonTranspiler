@@ -64,7 +64,23 @@ namespace MarathonTranspiler.Core
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(className))
+            if (mainAnnotation.Name == "flow")
+            {
+                // Find the appropriate class based on context or previous block
+                if (previousBlock != null && previousBlock.Annotations.Count > 0)
+                {
+                    var prevAnnotation = previousBlock.Annotations[0];
+                    className = prevAnnotation.Values.GetValue("className", string.Empty);
+                }
+
+                if (!string.IsNullOrWhiteSpace(className) && _classes.ContainsKey(className))
+                {
+                    ProcessFlow(_classes[className], block);
+                    return;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(className) && mainAnnotation.Name != "flow")
             {
                 throw new Exception("Class name not found.");
             }
@@ -104,6 +120,10 @@ namespace MarathonTranspiler.Core
 
                 case "hook":
                     ProcessHook(currentClass, block);
+                    break;
+
+                case "flow":
+                    ProcessFlow(currentClass, block);
                     break;
 
                 case "xml":
@@ -198,6 +218,11 @@ namespace MarathonTranspiler.Core
         }
 
         protected virtual void ProcessEvent(TranspiledClass currentClass, AnnotatedCode block)
+        {
+            // Platform-specific event handling to be implemented by derived classes
+        }
+
+        protected virtual void ProcessFlow(TranspiledClass currentClass, AnnotatedCode block)
         {
             // Platform-specific event handling to be implemented by derived classes
         }

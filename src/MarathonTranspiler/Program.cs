@@ -50,7 +50,7 @@ namespace MarathonTranspiler
                 var annotatedCode = marathonReader.ReadFile(fullPath);
 
                 var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions);
-                transpiler.ProcessAnnotatedCode(annotatedCode);
+                TranspilerFactory.ProcessAnnotatedCode(transpiler, annotatedCode, true);
                 var outputCode = transpiler.GenerateOutput();
 
                 // Write the transpiled code to a .cs file
