@@ -23,7 +23,7 @@ namespace MarathonTranspiler.Test
                 TestFramework = "nunit",
             };
 
-            var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions);
+            var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions, new Extensions.StaticMethodRegistry());
             transpiler.ProcessAnnotatedCode(annotatedCode);
             var output = transpiler.GenerateOutput();
         }
@@ -48,7 +48,7 @@ namespace MarathonTranspiler.Test
                 },
             };
 
-            var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions);
+            var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions, new Extensions.StaticMethodRegistry());
             transpiler.ProcessAnnotatedCode(annotatedCode);
             var output = transpiler.GenerateOutput();
         }
@@ -73,7 +73,7 @@ namespace MarathonTranspiler.Test
                 },
             };
 
-            var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions);
+            var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions, new Extensions.StaticMethodRegistry());
             transpiler.ProcessAnnotatedCode(annotatedCode);
             var output = transpiler.GenerateOutput();
         }
@@ -94,7 +94,7 @@ namespace MarathonTranspiler.Test
                 TestFramework = "nunit",
             };
 
-            var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions);
+            var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions, new Extensions.StaticMethodRegistry());
             transpiler.ProcessAnnotatedCode(annotatedCode);
             var output = transpiler.GenerateOutput();
         }

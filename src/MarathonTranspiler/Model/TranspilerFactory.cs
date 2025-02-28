@@ -1,5 +1,7 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Extensions;
 using MarathonTranspiler.Transpilers.CSharp;
+using MarathonTranspiler.Transpilers.FullStackWeb;
 using MarathonTranspiler.Transpilers.Orleans;
 using MarathonTranspiler.Transpilers.Python;
 using MarathonTranspiler.Transpilers.React;
@@ -16,15 +18,16 @@ namespace MarathonTranspiler.Model
 {
     public class TranspilerFactory
     {
-        public static MarathonTranspilerBase CreateTranspiler(TranspilerOptions options)
+        public static MarathonTranspilerBase CreateTranspiler(TranspilerOptions options, StaticMethodRegistry registry)
         {
             return options.Target.ToLower() switch
             {
-                "csharp" => new CSharpTranspiler(options.CSharp),
+                "csharp" => new CSharpTranspiler(options.CSharp, registry),
                 "orleans" => new OrleansTranspiler(options.Orleans),
                 "unity" => new UnityTranspiler(options.Unity),
-                "react" => new ReactTranspiler(options.React),
+                "react" => new ReactTranspiler(options.React, registry),
                 "react-redux" => new ReactReduxTranspiler(options.ReactRedux),
+                "fullstackweb" => new FullStackWebTranspiler(options.FullStackWeb, registry),
                 "python" => new PythonTranspiler(options.Python),
                 "wpf" => new WpfTranspiler(options.Wpf),
                 _ => throw new ArgumentException($"Unsupported target: {options.Target}")

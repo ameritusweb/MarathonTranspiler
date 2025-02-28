@@ -14,7 +14,7 @@ namespace MarathonTranspiler.Test
         {
             _transpiler = new CSharpTranspiler(new CSharpConfig() { 
                 TestFramework = "nunit"
-            });
+            }, new Extensions.StaticMethodRegistry());
             _annotatedCode = new List<AnnotatedCode>();
         }
 

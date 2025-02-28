@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Extensions;
 using MarathonTranspiler.Model;
 using MarathonTranspiler.Readers;
 using Microsoft.Extensions.FileSystemGlobbing;
@@ -42,6 +43,9 @@ namespace MarathonTranspiler
             // Execute the matcher
             var matchingResult = matcher.Execute(directoryInfo);
 
+            StaticMethodRegistry registry = new StaticMethodRegistry();
+            registry.Initialize(currentDirectory);
+
             // Output the matched files
             foreach (var file in matchingResult.Files)
             {
@@ -49,7 +53,7 @@ namespace MarathonTranspiler
                 var marathonReader = new MarathonReader();
                 var annotatedCode = marathonReader.ReadFile(fullPath);
 
-                var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions);
+                var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions, registry);
                 TranspilerFactory.ProcessAnnotatedCode(transpiler, annotatedCode, true);
                 var outputCode = transpiler.GenerateOutput();
 

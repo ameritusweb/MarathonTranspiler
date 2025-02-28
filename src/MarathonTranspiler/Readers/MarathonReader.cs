@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Model;
 using System.Text.RegularExpressions;
 
 namespace MarathonTranspiler.Readers
@@ -10,6 +11,72 @@ namespace MarathonTranspiler.Readers
 
         // New regex for complex type array syntax in varInit
         private static readonly Regex TypeArrayRegex = new(@"type=(\[.*?\])");
+
+        private static readonly Regex InlineMethodRegex = new(@"``@(\w+)\.(\w+)(\(.*?\))?");
+
+        public List<InlineMethodCall> ExtractInlineMethodCalls(string code)
+        {
+            var result = new List<InlineMethodCall>();
+            var matches = InlineMethodRegex.Matches(code);
+
+            foreach (Match match in matches)
+            {
+                var className = match.Groups[1].Value;
+                var methodName = match.Groups[2].Value;
+                var argsString = match.Groups[3].Success ? match.Groups[3].Value : "()";
+
+                // Parse the arguments (simplified version)
+                var args = ParseArguments(argsString);
+
+                result.Add(new InlineMethodCall
+                {
+                    ClassName = className,
+                    MethodName = methodName,
+                    Arguments = args,
+                    FullMatch = match.Value,
+                    StartIndex = match.Index,
+                    Length = match.Length
+                });
+            }
+
+            return result;
+        }
+
+        private List<string> ParseArguments(string argsString)
+        {
+            if (argsString == "()" || string.IsNullOrEmpty(argsString))
+                return new List<string>();
+
+            // Remove the parentheses
+            argsString = argsString.Substring(1, argsString.Length - 2);
+
+            var args = new List<string>();
+            var current = "";
+            var depth = 0;
+
+            foreach (var c in argsString)
+            {
+                if (c == '(' || c == '[' || c == '{')
+                    depth++;
+                else if (c == ')' || c == ']' || c == '}')
+                    depth--;
+
+                if (c == ',' && depth == 0)
+                {
+                    args.Add(current.Trim());
+                    current = "";
+                }
+                else
+                {
+                    current += c;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(current))
+                args.Add(current.Trim());
+
+            return args;
+        }
 
         public List<AnnotatedCode> ParseFile(List<string> lines)
         {

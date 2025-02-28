@@ -14,10 +14,11 @@ namespace MarathonTranspiler.Transpilers.CSharp
         private readonly CSharpConfig _config;
         private readonly CSharpTestGenerator _testGenerator;
 
-        public CSharpTranspiler(CSharpConfig config)
+        public CSharpTranspiler(CSharpConfig config, StaticMethodRegistry registry)
         {
             _config = config;
             _testGenerator = new CSharpTestGenerator(config);
+            _inliningHelper = new StaticMethodInliningHelper(registry);
         }
 
         public override string GenerateOutput()

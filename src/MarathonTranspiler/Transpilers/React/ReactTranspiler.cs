@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Extensions;
 using MarathonTranspiler.Helpers;
 using MarathonTranspiler.Model;
 using System;
@@ -18,10 +19,11 @@ namespace MarathonTranspiler.Transpilers.React
         private readonly ReactConfig _config;
         private readonly ReactTestGenerator _testGenerator;
 
-        public ReactTranspiler(ReactConfig config)
+        public ReactTranspiler(ReactConfig config, StaticMethodRegistry registry)
         {
             this._config = config;
             this._testGenerator = new ReactTestGenerator(config);
+            this._inliningHelper = new StaticMethodInliningHelper(registry);
 
             // Add default hooks based on configuration
             if (config.IncludedHooks != null)
