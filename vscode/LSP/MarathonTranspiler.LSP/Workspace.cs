@@ -5,6 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using System.Collections.Concurrent;
+using MarathonTranspiler.LSP.Extensions;
 
 namespace MarathonTranspiler.LSP
 {
@@ -14,6 +15,7 @@ namespace MarathonTranspiler.LSP
         private readonly ConcurrentDictionary<DocumentUri, string[]> _documentLines = new();
         private ILanguageServer _server;
         private string _rootPath;
+        private StaticMethodRegistry? _registry;
 
         public void Initialize(ILanguageServer server, string rootPath)
         {
@@ -23,6 +25,12 @@ namespace MarathonTranspiler.LSP
 
         public void UpdateDocument(DocumentUri uri, string text)
         {
+            if (_registry == null)
+            {
+                _registry = new StaticMethodRegistry();
+                _registry.Initialize(uri.ToUri().AbsolutePath);
+            }
+
             _documents[uri] = text;
             _documentLines[uri] = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
         }
@@ -141,6 +149,16 @@ namespace MarathonTranspiler.LSP
                 Uri = uri,
                 Diagnostics = new Container<Diagnostic>(diagnostics)
             });
+        }
+
+        public IEnumerable<string> GetAvailableClasses()
+        {
+            return _registry!.GetAvailableClasses();
+        }
+
+        public IEnumerable<string> GetMethodsForClass(string className)
+        {
+            return _registry!.GetMethodsForClass(className);
         }
     }
 }

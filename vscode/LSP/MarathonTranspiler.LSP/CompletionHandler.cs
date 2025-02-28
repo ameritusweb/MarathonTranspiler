@@ -284,6 +284,41 @@ namespace MarathonTranspiler.LSP
 
             var linePrefix = position.Character > 0 ? line.Substring(0, position.Character) : string.Empty;
 
+            // Check if we're in an inline method context
+            if (linePrefix.EndsWith("``@"))
+            {
+                // Suggest available classes
+                var completions = _workspace.GetAvailableClasses()
+                    .Select(className => new CompletionItem
+                    {
+                        Label = className,
+                        Kind = CompletionItemKind.Class,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = $"{className}.${{1:method}}"
+                    }).ToList();
+
+                return Task.FromResult(new CompletionList(completions));
+            }
+
+            // Check if we're after a dot in an inline method
+            var classNameMatch = System.Text.RegularExpressions.Regex.Match(linePrefix, @"``@(\w+)\.$");
+            if (classNameMatch.Success)
+            {
+                var className = classNameMatch.Groups[1].Value;
+
+                // Suggest methods for this class
+                var completions = _workspace.GetMethodsForClass(className)
+                    .Select(methodName => new CompletionItem
+                    {
+                        Label = methodName,
+                        Kind = CompletionItemKind.Method,
+                        InsertTextFormat = InsertTextFormat.Snippet,
+                        InsertText = methodName
+                    }).ToList();
+
+                return Task.FromResult(new CompletionList(completions));
+            }
+
             // Check if we're inside a run block (by checking previous lines)
             bool insideRunBlock = false;
             for (int i = position.Line - 1; i >= 0 && i >= position.Line - 10; i--)
