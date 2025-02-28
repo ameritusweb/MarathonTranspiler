@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Helpers;
 using MarathonTranspiler.Model;
 using System;
 using System.Collections.Generic;
@@ -21,11 +22,9 @@ namespace MarathonTranspiler.Transpilers.CSharp
                 var trimmedLine = line.Trim();
 
                 // Check for direct flow reference: {flowName}
-                var directFlowMatch = Regex.Match(trimmedLine, @"^\{([^}]+)\}$");
-
-                if (directFlowMatch.Success)
+                if (FlowProcessingHelper.IsDirectFlowReference(trimmedLine))
                 {
-                    var flowName = directFlowMatch.Groups[1].Value;
+                    var flowName = FlowProcessingHelper.ExtractDirectFlowName(trimmedLine);
                     processedCode.AddRange(ProcessDirectFlowReference(flowName));
                     continue;
                 }
@@ -125,12 +124,64 @@ namespace MarathonTranspiler.Transpilers.CSharp
             }
 
             var loopExpr = loopExprMatch.Groups[1].Value;
-            var parts = loopExpr.Split(':');
 
-            if (parts.Length == 1)
+            // Use the shared helper to parse the loop expression
+            var (item, collection, operation) = FlowProcessingHelper.ParseLoopExpression(loopExpr);
+
+            if (string.IsNullOrEmpty(operation))
             {
-                // Simple loop over a collection: [collection]
-                result.Add($"foreach (var item in {parts[0].Trim()}) {{");
+                if (item == "item" && !collection.Contains(":"))
+                {
+                    // Simple loop over a collection: [collection]
+                    result.Add($"foreach (var item in {collection}) {{");
+
+                    // Process the flow code to handle any nested flow references
+                    var flowCode = new List<string>(_flows[flowName]);
+                    var processedFlowCode = ProcessControlFlowSyntax(flowCode, methodName, currentClass);
+                    result.AddRange(processedFlowCode.Select(l => $"    {l}"));
+
+                    result.Add("}");
+                }
+                else
+                {
+                    // Basic iteration with item variable: [item:collection]
+                    result.Add($"foreach (var {item} in {collection}) {{");
+
+                    // Process the flow code to handle any nested flow references
+                    var flowCode = new List<string>(_flows[flowName]);
+                    var processedFlowCode = ProcessControlFlowSyntax(flowCode, methodName, currentClass);
+                    result.AddRange(processedFlowCode.Select(l => $"    {l}"));
+
+                    result.Add("}");
+                }
+            }
+            else if (operation == "range")
+            {
+                // Numeric range: [i=1:10]
+                var rangeParts = collection.Split(':');
+                if (rangeParts.Length == 2)
+                {
+                    var start = rangeParts[0];
+                    var end = rangeParts[1];
+
+                    // Determine if inclusive (square brackets) or exclusive (parentheses)
+                    bool isInclusive = line.Contains("[");
+
+                    result.Add($"for (int {item} = {start}; {item} {(isInclusive ? "<=" : "<")} {end}; {item}++) {{");
+
+                    // Process the flow code to handle any nested flow references
+                    var flowCode = new List<string>(_flows[flowName]);
+                    var processedFlowCode = ProcessControlFlowSyntax(flowCode, methodName, currentClass);
+                    result.AddRange(processedFlowCode.Select(l => $"    {l}"));
+
+                    result.Add("}");
+                }
+            }
+            else if (operation.StartsWith("filter:"))
+            {
+                // Filtering (Where): [x:x > 5:numbers]
+                string filterLambda = operation.Substring(7).Replace(item, "x");
+                result.Add($"foreach (var {item} in {collection}.Where(x => {filterLambda})) {{");
 
                 // Process the flow code to handle any nested flow references
                 var flowCode = new List<string>(_flows[flowName]);
@@ -139,121 +190,11 @@ namespace MarathonTranspiler.Transpilers.CSharp
 
                 result.Add("}");
             }
-            else if (parts.Length == 2)
+            else if (operation.StartsWith("transform:"))
             {
-                // Either [item:collection] or [i=start:end]
-                var firstPart = parts[0].Trim();
-                var secondPart = parts[1].Trim();
-
-                if (firstPart.Contains("="))
-                {
-                    // Numeric range: [i=1:10]
-                    var rangeMatch = Regex.Match(loopExpr, @"(\w+)=(\d+):(\d+)");
-                    if (rangeMatch.Success)
-                    {
-                        var varName = rangeMatch.Groups[1].Value;
-                        var start = rangeMatch.Groups[2].Value;
-                        var end = rangeMatch.Groups[3].Value;
-
-                        // Determine if inclusive (square brackets) or exclusive (parentheses)
-                        bool isInclusive = line.Contains("[");
-
-                        result.Add($"for (int {varName} = {start}; {varName} {(isInclusive ? "<=" : "<")} {end}; {varName}++) {{");
-
-                        // Process the flow code to handle any nested flow references
-                        var flowCode = new List<string>(_flows[flowName]);
-                        var processedFlowCode = ProcessControlFlowSyntax(flowCode, methodName, currentClass);
-                        result.AddRange(processedFlowCode.Select(l => $"    {l}"));
-
-                        result.Add("}");
-                    }
-                }
-                else
-                {
-                    // Basic iteration with item variable: [item:collection]
-                    result.Add($"foreach (var {firstPart} in {secondPart}) {{");
-
-                    // Process the flow code to handle any nested flow references
-                    var flowCode = new List<string>(_flows[flowName]);
-                    var processedFlowCode = ProcessControlFlowSyntax(flowCode, methodName, currentClass);
-                    result.AddRange(processedFlowCode.Select(l => $"    {l}"));
-
-                    result.Add("}");
-                }
-            }
-            else if (parts.Length == 3)
-            {
-                // Filter or transform: [item:transform/condition:collection]
-                var itemVar = parts[0].Trim();
-                var operation = parts[1].Trim();
-                var collection = parts[2].Trim();
-
-                // Check if this is a condition (filtering) by looking for comparison operators
-                bool isFilter = operation.Contains(">") || operation.Contains("<") ||
-                               operation.Contains("==") || operation.Contains("!=") ||
-                               operation.StartsWith("!") || operation.Contains("&&") ||
-                               operation.Contains("||");
-
-                bool isTransform = !isFilter;
-
-                if (isTransform)
-                {
-                    // Transformation (Select): [t:t.ToUpper():myStrings]
-                    // operation should reference the item variable
-                    string transformLambda = operation.Replace(itemVar, "x");
-                    result.Add($"foreach (var {itemVar} in {collection}.Select(x => {transformLambda})) {{");
-
-                    // Process the flow code to handle any nested flow references
-                    var flowCode = new List<string>(_flows[flowName]);
-                    var processedFlowCode = ProcessControlFlowSyntax(flowCode, methodName, currentClass);
-                    result.AddRange(processedFlowCode.Select(l => $"    {l}"));
-
-                    result.Add("}");
-                }
-                else if (isFilter)
-                {
-                    // Filtering (Where): [x:x > 5:numbers]
-                    string filterLambda = operation.Replace(itemVar, "x");
-                    result.Add($"foreach (var {itemVar} in {collection}.Where(x => {filterLambda})) {{");
-
-                    // Process the flow code to handle any nested flow references
-                    var flowCode = new List<string>(_flows[flowName]);
-                    var processedFlowCode = ProcessControlFlowSyntax(flowCode, methodName, currentClass);
-                    result.AddRange(processedFlowCode.Select(l => $"    {l}"));
-
-                    result.Add("}");
-                }
-            }
-            else if (parts.Length > 3)
-            {
-                // Chained operations: [result:transform:filter:collection]
-                var itemVar = parts[0].Trim();
-                var operations = parts.Skip(1).Take(parts.Length - 2).ToList();
-                var collection = parts[parts.Length - 1].Trim();
-
-                // Start with the collection
-                var queryExpr = collection;
-
-                // Apply each operation in sequence
-                foreach (var op in operations)
-                {
-                    if (op.Contains(">") || op.Contains("<") || op.Contains("==") ||
-                        op.Contains("!=") || op.StartsWith("!") || op.Contains("&&") ||
-                        op.Contains("||"))
-                    {
-                        // This is a filter
-                        string filterLambda = op.Replace(itemVar, "x");
-                        queryExpr = $"{queryExpr}.Where(x => {filterLambda})";
-                    }
-                    else
-                    {
-                        // This is a transform
-                        string transformLambda = op.Replace(itemVar, "x");
-                        queryExpr = $"{queryExpr}.Select(x => {transformLambda})";
-                    }
-                }
-
-                result.Add($"foreach (var {itemVar} in {queryExpr}) {{");
+                // Transformation (Select): [t:t.ToUpper():myStrings]
+                string transformLambda = operation.Substring(10).Replace(item, "x");
+                result.Add($"foreach (var {item} in {collection}.Select(x => {transformLambda})) {{");
 
                 // Process the flow code to handle any nested flow references
                 var flowCode = new List<string>(_flows[flowName]);
@@ -270,12 +211,11 @@ namespace MarathonTranspiler.Transpilers.CSharp
         {
             var result = new List<string>();
 
-            // Extract condition from if statement
-            var conditionMatch = Regex.Match(line.Trim(), @"``@if\s+(\([^)]+\))\s+\{");
+            // Extract condition from if statement using the helper
+            var condition = FlowProcessingHelper.ExtractCondition(line);
 
-            if (conditionMatch.Success && _flows.ContainsKey(flowName))
+            if (!string.IsNullOrEmpty(condition) && _flows.ContainsKey(flowName))
             {
-                var condition = conditionMatch.Groups[1].Value;
                 result.Add($"if {condition} {{");
                 result.AddRange(_flows[flowName].Select(l => $"    {l}"));
                 result.Add("}");

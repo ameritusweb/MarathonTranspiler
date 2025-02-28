@@ -14,5 +14,20 @@ namespace MarathonTranspiler.Transpilers.React
 
         [JsonPropertyName("hooks")]
         public List<string> IncludedHooks { get; set; } = new();  // useState, useEffect etc.
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = "App";
+
+        [JsonPropertyName("testFramework")]
+        public string TestFramework { get; set; } = "jest"; // jest, testing-library, etc.
+
+        [JsonPropertyName("flowSystem")]
+        public bool UseFlowSystem { get; set; } = true;
+
+        [JsonPropertyName("strictMode")]
+        public bool UseStrictMode { get; set; } = false;
+
+        [JsonPropertyName("errorBoundary")]
+        public bool GenerateErrorBoundary { get; set; } = false;
     }
 }
