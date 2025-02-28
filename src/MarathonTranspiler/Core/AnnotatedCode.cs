@@ -12,6 +12,8 @@ namespace MarathonTranspiler.Core
 
         public List<string> Code { get; set; } = new List<string>();
 
+        public Dictionary<string, List<string>> AdditionalData { get; set; } = new();
+
         // Helper method to check if this block contains control flow syntax
         public bool ContainsControlFlow()
         {

@@ -12,37 +12,41 @@ namespace MarathonTranspiler.Extensions
     public class StaticMethodInliner
     {
         private readonly StaticMethodRegistry _registry;
+        private readonly HashSet<string> _addedDependencies = new HashSet<string>();
 
         public StaticMethodInliner(StaticMethodRegistry registry)
         {
             _registry = registry;
         }
 
-        public string ProcessInlining(string code, string targetLanguage)
+        public string ProcessInlining(string code, out List<string> dependencies)
         {
+            _addedDependencies.Clear();
             var reader = new MarathonReader();
             var inlineCalls = reader.ExtractInlineMethodCalls(code);
 
-            // Process from end to start to avoid index changes
             foreach (var call in inlineCalls.OrderByDescending(c => c.StartIndex))
             {
                 if (_registry.TryGetMethod(call.ClassName, call.MethodName, out var method))
                 {
-                    var inlinedCode = TransformMethodBody(method, call.Arguments, targetLanguage);
+                    // Add dependencies
+                    foreach (var dependency in method.Dependencies)
+                    {
+                        _addedDependencies.Add(dependency);
+                    }
+
+                    var inlinedCode = TransformMethodBody(method, call.Arguments);
                     code = code.Substring(0, call.StartIndex) +
                            inlinedCode +
                            code.Substring(call.StartIndex + call.Length);
                 }
-                else
-                {
-                    // Method not found - could log a warning here
-                }
             }
 
+            dependencies = _addedDependencies.ToList();
             return code;
         }
 
-        private string TransformMethodBody(MethodInfo method, List<string> arguments, string targetLanguage)
+        private string TransformMethodBody(MethodInfo method, List<string> arguments)
         {
             string body = method.Body;
 
@@ -56,7 +60,6 @@ namespace MarathonTranspiler.Extensions
                 var argument = arguments[i];
 
                 // Use regex to replace only parameter references, not variable declarations
-                // This is a simplified version - might need improvement for complex cases
                 body = Regex.Replace(body, $@"(?<!\w){parameter}(?!\w)", argument);
             }
 

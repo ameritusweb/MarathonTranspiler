@@ -1,14 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection.Metadata;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using System.Xml.Linq;
-using MarathonTranspiler.Model;
+﻿using MarathonTranspiler.Model;
 using Acornima.Ast;
 using Acornima;
+using System.Text.RegularExpressions;
 
 namespace MarathonTranspiler.Readers
 {
@@ -43,7 +36,8 @@ namespace MarathonTranspiler.Readers
                                     Body = ExtractBody(methodDef.Value.As<FunctionExpression>().Body),
                                     Parameters = ExtractParameters(methodDef.Value.As<FunctionExpression>()),
                                     IsStatic = true,
-                                    SourceFile = filePath
+                                    SourceFile = filePath,
+                                    Dependencies = ExtractDependencies(methodDef)
                                 };
                                 methods.Add(method);
                             }
@@ -88,6 +82,33 @@ namespace MarathonTranspiler.Readers
                 }
             }
             return parameters;
+        }
+
+        private List<string> ExtractDependencies(Acornima.Ast.MethodDefinition methodDef)
+        {
+            var dependencies = new List<string>();
+
+            // Look for JSDoc comments with @dependency tag
+            if (methodDef.Decorators.Any())
+            {
+                foreach (var comment in methodDef.Decorators)
+                {
+                    if (comment != null && comment.ToString()!.Contains("@dependency"))
+                    {
+                        // Extract dependency values from comment
+                        var matches = Regex.Matches(comment.ToString()!, @"@dependency\s+(.+?)(?=\s*@|\s*\*\/|$)");
+                        foreach (Match match in matches)
+                        {
+                            if (match.Groups.Count > 1)
+                            {
+                                dependencies.Add(match.Groups[1].Value.Trim());
+                            }
+                        }
+                    }
+                }
+            }
+
+            return dependencies;
         }
     }
 }

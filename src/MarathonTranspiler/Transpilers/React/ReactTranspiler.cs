@@ -44,6 +44,23 @@ namespace MarathonTranspiler.Transpilers.React
             {
                 sb.AppendLine(import);
             }
+
+            // Add dependencies like using statements
+            if (_classes.Values.Any(c => c.AdditionalData.ContainsKey("imports")))
+            {
+                foreach (var classInfo in _classes.Values)
+                {
+                    if (classInfo.AdditionalData.ContainsKey("imports"))
+                    {
+                        foreach (var importStatement in (List<string>)classInfo.AdditionalData["imports"])
+                        {
+                            sb.AppendLine(importStatement);
+                        }
+                    }
+                }
+                sb.AppendLine();
+            }
+
             sb.AppendLine();
 
             // Generate custom hooks

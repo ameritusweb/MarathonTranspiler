@@ -32,6 +32,22 @@ namespace MarathonTranspiler.Transpilers.CSharp
                 sb.AppendLine();
             }
 
+            // Add dependencies like using statements
+            if (_classes.Values.Any(c => c.AdditionalData.ContainsKey("usings")))
+            {
+                foreach (var classInfo in _classes.Values)
+                {
+                    if (classInfo.AdditionalData.ContainsKey("usings"))
+                    {
+                        foreach (var usingStatement in (List<string>)classInfo.AdditionalData["usings"])
+                        {
+                            sb.AppendLine(usingStatement);
+                        }
+                    }
+                }
+                sb.AppendLine();
+            }
+
             // Generate the main class definitions
             foreach (var classInfo in _classes.Values)
             {

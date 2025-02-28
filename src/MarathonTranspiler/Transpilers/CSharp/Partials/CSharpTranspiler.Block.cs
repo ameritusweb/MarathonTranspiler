@@ -16,7 +16,7 @@ namespace MarathonTranspiler.Transpilers.CSharp
         protected internal override void ProcessBlock(AnnotatedCode block, AnnotatedCode? previousBlock)
         {
             // Apply inlining before standard processing
-            _inliningHelper.ProcessInlining(block, "csharp");
+            _inliningHelper.ProcessInlining(block);
 
             // Continue with normal processing
             base.ProcessBlock(block, previousBlock);

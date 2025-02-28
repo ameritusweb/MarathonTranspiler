@@ -92,6 +92,10 @@ namespace MarathonTranspiler.Core
 
             var currentClass = _classes[className];
 
+            block.AdditionalData.Keys.ToList().ForEach((x) => {
+                currentClass.AdditionalData.Add(x, block.AdditionalData[x]);
+            });
+
             switch (mainAnnotation.Name)
             {
                 case "varInit":

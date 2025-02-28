@@ -28,7 +28,8 @@ namespace MarathonTranspiler.Readers
                         Body = ExtractBody(method),
                         Parameters = ExtractParameters(method),
                         IsStatic = true,
-                        SourceFile = filePath
+                        SourceFile = filePath,
+                        Dependencies = ExtractDependencies(method)
                     };
                     methods.Add(methodInfo);
                 }
@@ -58,6 +59,36 @@ namespace MarathonTranspiler.Readers
             return method.ParameterList.Parameters
                 .Select(p => p.Identifier.Text)
                 .ToList();
+        }
+
+        private List<string> ExtractDependencies(MethodDeclarationSyntax method)
+        {
+            var dependencies = new List<string>();
+
+            // Look for [Dependency("...")] attributes
+            foreach (var attributeList in method.AttributeLists)
+            {
+                foreach (var attribute in attributeList.Attributes)
+                {
+                    if (attribute.Name.ToString() == "Dependency" ||
+                        attribute.Name.ToString() == "DependencyAttribute")
+                    {
+                        // Extract the argument value
+                        if (attribute.ArgumentList?.Arguments.Count > 0)
+                        {
+                            var firstArg = attribute.ArgumentList.Arguments[0];
+                            if (firstArg.Expression is LiteralExpressionSyntax literal &&
+                                literal.Kind() == SyntaxKind.StringLiteralExpression)
+                            {
+                                string dependencyValue = literal.Token.ValueText;
+                                dependencies.Add(dependencyValue);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return dependencies;
         }
     }
 }

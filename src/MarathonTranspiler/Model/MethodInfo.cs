@@ -13,5 +13,6 @@ namespace MarathonTranspiler.Model
         public List<string> Parameters { get; set; }
         public bool IsStatic { get; set; }
         public string SourceFile { get; set; }
+        public List<string> Dependencies { get; set; } = new List<string>();
     }
 }
