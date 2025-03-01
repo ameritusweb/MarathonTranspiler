@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35806.99 d17.13
+VisualStudioVersion = 17.13.35806.99
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarathonTranspiler", "MarathonTranspiler.csproj", "{CA038240-C354-4BBC-80C0-A509556B6266}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarathonTranspiler.Test", "..\..\test\MarathonTranspiler.Test\MarathonTranspiler.Test.csproj", "{15002CA3-142B-BC84-97B6-CA6442AA6214}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Marathon.CLI", "..\..\cli\Marathon.CLI\Marathon.CLI.csproj", "{326F659F-B487-4316-B412-CD1E401A7AD2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{15002CA3-142B-BC84-97B6-CA6442AA6214}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{15002CA3-142B-BC84-97B6-CA6442AA6214}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{15002CA3-142B-BC84-97B6-CA6442AA6214}.Release|Any CPU.Build.0 = Release|Any CPU
+		{326F659F-B487-4316-B412-CD1E401A7AD2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{326F659F-B487-4316-B412-CD1E401A7AD2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{326F659F-B487-4316-B412-CD1E401A7AD2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{326F659F-B487-4316-B412-CD1E401A7AD2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

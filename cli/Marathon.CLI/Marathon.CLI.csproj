@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<PackAsTool>true</PackAsTool>
+		<PackageOutputPath>./nupkg</PackageOutputPath>
+		<ToolCommandName>marathon</ToolCommandName>
+		<Version>1.0.0</Version>
+		<Authors>ameritusweb</Authors>
+		<Description>Marathon Transpiler CLI tool for Runtime-First development</Description>
+		<PackageId>Marathon.CLI</PackageId>
+		<Product>Marathon Transpiler</Product>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+		<PackageReleaseNotes>
+			Initial release of the Marathon Transpiler CLI tool.
+			- Added core transpilation functionality.
+			- Implemented command-line interface.
+			- Basic error handling.
+		</PackageReleaseNotes>
+		<PackageProjectUrl>https://github.com/ameritusweb/MarathonTranspiler</PackageProjectUrl>
+		<RepositoryType>git</RepositoryType>
+		<RepositoryUrl>https://github.com/ameritusweb/MarathonTranspiler.git</RepositoryUrl>
+		<Copyright>Copyright © 2025 ameritusweb. All rights reserved.</Copyright>
+
+		<PackageTags>transpiler;cli;runtime;development;tools</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="LICENSE" Pack="true" PackagePath="\" />
+		<None Include="README.md" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="9.0.2" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MarathonTranspiler\MarathonTranspiler.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -11,6 +11,118 @@ Traditional programming starts with static structures (classes, methods) before 
 
 Marathon lets you write code in the order it executes, then handles the structure for you.
 
+## Key Features
+
+- **Runtime-First Development**: Write code in the order it executes
+- **Multiple Target Frameworks**: Generate code for C#, React, React Redux, ASP.NET, Orleans, Unity, Python, and WPF
+- **VS Code Integration**: Full language server support with autocompletion, diagnostics, hover information, and semantic highlighting
+- **Seamless Testing**: Integrate assertions directly into your runtime flow and automatically generate unit tests
+- **Advanced Flow Control**: Use powerful flow syntax for complex control patterns
+
+## New Features
+
+### Advanced Flow System
+- Named flow blocks with `@flow(name="flowName")`
+- Control flow syntax with ``@keyword {flowName}``
+- Direct flow references with `{flowName}`
+- Advanced loop syntax with transformation and filtering:
+  ```
+  ``@loop [item:collection] {ProcessItem}               // Basic iteration
+  ``@loop [i=1:10] {CountUp}                           // Numeric range (inclusive)
+  ``@loop [t:t.ToUpper():myStrings] {ProcessUppercase}  // Transformation
+  ``@loop [x:x > 5:numbers] {ProcessLargeNumbers}       // Filtering
+  ```
+
+### Enhanced VS Code Extension
+- Smart autocompletion with context-aware suggestions
+- Real-time diagnostics for annotation validation
+- Semantic highlighting for better code readability
+- Go-to-definition support for navigating between related code blocks
+- Hover information for annotation documentation
+
+### Static Method Inlining
+- Inline static methods with ``@ClassName.MethodName() syntax
+- Automatic dependency resolution and inclusion
+- Cross-language support for both C# and JavaScript/TypeScript methods
+
+### Full-Stack Web Development Support
+- Generate both frontend (React/Redux) and backend (ASP.NET) code from a single source
+- Model relationship handling for entity frameworks
+- Automatic REST API endpoint generation
+- Redux state management with normalized selectors
+
+### Advanced Testing Integration
+- Runtime-First TDD with `@assert` annotations embedded in the execution flow
+- Automatic test case generation for multiple frameworks (xUnit, NUnit, Jest)
+- Framework-specific test optimizations
+
+### Orleans Integration
+- First-class support for Microsoft Orleans distributed framework
+- Automatic grain interface and implementation generation
+- Stateful grain management
+
+## Getting Started
+
+### Installation
+
+```bash
+# Install the CLI tool
+dotnet tool install --global Marathon.CLI
+
+# Install the VS Code extension
+code --install-extension marathon-transpiler.vsix
+```
+
+### Basic Usage
+
+Create a `mrtconfig.json` file in your project root:
+
+```json
+{
+  "transpilerOptions": {
+    "target": "csharp",
+    "csharp": {
+      "testFramework": "xunit"
+    }
+  },
+  "include": ["**/*.mrt"],
+  "exclude": ["**/node_modules/**"],
+  "rootDir": "./src"
+}
+```
+
+Create a `.mrt` file with runtime-first code:
+
+```csharp
+@varInit(className="Counter", type="int")
+this.count = 0;
+
+@run(className="Counter", functionName="increment")
+this.count++;
+Console.WriteLine($"Count: {this.count}");
+
+@assert(className="Counter", condition="this.count > 0")
+"Increment should increase count"
+```
+
+Run the transpiler using the CLI:
+
+```bash
+# Basic transpilation
+marathon transpile
+
+# Watch for changes and transpile automatically
+marathon watch
+
+# List all available inlineable functions
+marathon list
+
+# Initialize a new project
+marathon init --target csharp
+```
+
+The transpiler will generate properly structured code in the target language.
+
 # **Runtime-First Software Development: A Paradigm Shift in Code Design and Test-Driven Development**
 
 ## **Introduction**
