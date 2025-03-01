@@ -25,10 +25,22 @@ namespace MarathonTranspiler.LSP.Extensions
                 RegisterMethods(methods);
             }
 
-            // Scan for JS/TS files
-            foreach (var file in Directory.GetFiles(libraryDirectory, "*.js", SearchOption.AllDirectories)
-                .Concat(Directory.GetFiles(libraryDirectory, "*.ts", SearchOption.AllDirectories)))
+            // Scan for JS files
+            foreach (var file in Directory.GetFiles(libraryDirectory, "*.js", SearchOption.AllDirectories))
             {
+                if (Path.DirectorySeparatorChar == '\\')
+                {
+                    // Windows path comparison
+                    if (file.IndexOf("\\node_modules\\", StringComparison.OrdinalIgnoreCase) != -1)
+                        continue;
+                }
+                else
+                {
+                    // Unix path comparison
+                    if (file.IndexOf("/node_modules/", StringComparison.Ordinal) != -1)
+                        continue;
+                }
+
                 var methods = _jstsParser.ParseFile(file);
                 RegisterMethods(methods);
             }
@@ -40,7 +52,7 @@ namespace MarathonTranspiler.LSP.Extensions
         {
             foreach (var method in methods)
             {
-                string className = ExtractClassName(method.SourceFile);
+                string className = method.ClassName;
 
                 if (!_methodsByClass.ContainsKey(className))
                 {
@@ -49,12 +61,6 @@ namespace MarathonTranspiler.LSP.Extensions
 
                 _methodsByClass[className][method.Name] = method;
             }
-        }
-
-        private string ExtractClassName(string filePath)
-        {
-            // Simple heuristic: use the filename as class name
-            return Path.GetFileNameWithoutExtension(filePath);
         }
 
         public bool TryGetMethod(string className, string methodName, out MethodInfo method)

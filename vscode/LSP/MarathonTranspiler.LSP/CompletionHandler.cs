@@ -530,7 +530,7 @@ namespace MarathonTranspiler.LSP
                     Pattern = "**/*.mrt",
                     Language = "mrt"
                 }),
-                TriggerCharacters = new Container<string>(new[] { "@", "(", ",", " " }),
+                TriggerCharacters = new Container<string>(new[] { "@", "(", ",", " ", "." }),
                 ResolveProvider = true
             };
         }

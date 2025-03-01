@@ -28,8 +28,8 @@ namespace MarathonTranspiler.LSP
             if (_registry == null)
             {
                 _registry = new StaticMethodRegistry();
-                var fileInfo = new FileInfo(Path.Combine(uri.ToUri().AbsolutePath, "lib"));
-                _registry.Initialize(fileInfo.DirectoryName!);
+                var fileInfo = new FileInfo(uri.ToUri().AbsolutePath);
+                _registry.Initialize(Path.Combine(fileInfo.DirectoryName!, "lib"));
             }
 
             _documents[uri] = text;
