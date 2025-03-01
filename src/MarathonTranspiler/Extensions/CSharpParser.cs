@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace MarathonTranspiler.Readers
+namespace MarathonTranspiler.Extensions
 {
     public class CSharpParser
     {

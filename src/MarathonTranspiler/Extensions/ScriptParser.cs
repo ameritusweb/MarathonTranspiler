@@ -3,7 +3,7 @@ using Acornima.Ast;
 using Acornima;
 using System.Text.RegularExpressions;
 
-namespace MarathonTranspiler.Readers
+namespace MarathonTranspiler.Extensions
 {
     public class ScriptParser
     {
@@ -26,7 +26,7 @@ namespace MarathonTranspiler.Readers
                 case ClassDeclaration classDecl:
                     foreach (var member in classDecl.Body.Body)
                     {
-                        if (member is Acornima.Ast.MethodDefinition methodDef)
+                        if (member is MethodDefinition methodDef)
                         {
                             if (methodDef.Static)
                             {
@@ -84,7 +84,7 @@ namespace MarathonTranspiler.Readers
             return parameters;
         }
 
-        private List<string> ExtractDependencies(Acornima.Ast.MethodDefinition methodDef)
+        private List<string> ExtractDependencies(MethodDefinition methodDef)
         {
             var dependencies = new List<string>();
 
