@@ -22,11 +22,11 @@ namespace MarathonTranspiler.Helpers
 
         public void ProcessInlining(AnnotatedCode block)
         {
-            if (block.Code.Any() && block.Code.Any(line => line.Contains("``@")))
+            if (block.Code.Any() && block.Code.Any(line => line.Contains("--@")))
             {
                 for (int i = 0; i < block.Code.Count; i++)
                 {
-                    if (block.Code[i].Contains("``@"))
+                    if (block.Code[i].Contains("--@"))
                     {
                         List<string> dependencies;
                         block.Code[i] = _methodInliner.ProcessInlining(block.Code[i], out dependencies);

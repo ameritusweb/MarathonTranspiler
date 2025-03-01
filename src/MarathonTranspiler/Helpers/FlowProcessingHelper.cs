@@ -41,13 +41,13 @@ namespace MarathonTranspiler.Helpers
         }
 
         /// <summary>
-        /// Checks if a line contains a control flow syntax like ``@if {flowName}
+        /// Checks if a line contains a control flow syntax like --@if {flowName}
         /// </summary>
         /// <param name="line">The code line to check</param>
         /// <returns>True if the line contains control flow syntax</returns>
         public static bool IsControlFlowSyntax(string line)
         {
-            return line.TrimStart().StartsWith("``@");
+            return line.TrimStart().StartsWith("--@");
         }
 
         /// <summary>
@@ -121,7 +121,7 @@ namespace MarathonTranspiler.Helpers
         /// <returns>The extracted condition</returns>
         public static string ExtractCondition(string line)
         {
-            var conditionMatch = Regex.Match(line.Trim(), @"``@if\s+(\([^)]+\))\s+\{");
+            var conditionMatch = Regex.Match(line.Trim(), @"--@if\s+(\([^)]+\))\s+\{");
             if (conditionMatch.Success)
             {
                 return conditionMatch.Groups[1].Value;

@@ -12,7 +12,7 @@ namespace MarathonTranspiler.Readers
         // New regex for complex type array syntax in varInit
         private static readonly Regex TypeArrayRegex = new(@"type=(\[.*?\])");
 
-        private static readonly Regex InlineMethodRegex = new(@"``@(\w+)\.(\w+)(\(.*?\))?");
+        private static readonly Regex InlineMethodRegex = new(@"--@(\w+)\.(\w+)(\(.*?\))?");
 
         public List<InlineMethodCall> ExtractInlineMethodCalls(string code)
         {

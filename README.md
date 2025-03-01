@@ -23,16 +23,16 @@ Marathon lets you write code in the order it executes, then handles the structur
 
 ### Advanced Flow System
 - Named flow blocks with `@flow(name="flowName")`
-- Control flow syntax with ``@keyword {flowName}
+- Control flow syntax with `--@keyword {flowName}`
 - Direct flow references with `{flowName}`
-- Conditional branching with ``@if (condition) {flowName} and ``@else {flowName}
-- Switch/case handling with ``@switch (expression) {SwitchFlowName} and ``@case value {CaseFlowName}
+- Conditional branching with `--@if (condition) {flowName} and `--@else {flowName}`
+- Switch/case handling with `--@switch (expression) {SwitchFlowName}` and `--@case value {CaseFlowName}`
 - Advanced loop syntax with transformation and filtering:
   ```
-  ``@loop [item:collection] {ProcessItem}               // Basic iteration
-  ``@loop [i=1:10] {CountUp}                           // Numeric range (inclusive)
-  ``@loop [t:t.ToUpper():myStrings] {ProcessUppercase}  // Transformation
-  ``@loop [x:x > 5:numbers] {ProcessLargeNumbers}       // Filtering
+  --@loop [item:collection] {ProcessItem}               // Basic iteration
+  --@loop [i=1:10] {CountUp}                           // Numeric range (inclusive)
+  --@loop [t:t.ToUpper():myStrings] {ProcessUppercase}  // Transformation
+  --@loop [x:x > 5:numbers] {ProcessLargeNumbers}       // Filtering
   ```
 
 ### Enhanced VS Code Extension
@@ -43,7 +43,7 @@ Marathon lets you write code in the order it executes, then handles the structur
 - Hover information for annotation documentation
 
 ### Static Method Inlining
-- Inline static methods with ``@ClassName.MethodName() syntax
+- Inline static methods with --@ClassName.MethodName() syntax
 - Automatic dependency resolution and inclusion
 - Cross-language support for both C# and JavaScript/TypeScript methods
 

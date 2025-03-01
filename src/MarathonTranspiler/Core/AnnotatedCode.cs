@@ -17,7 +17,7 @@ namespace MarathonTranspiler.Core
         // Helper method to check if this block contains control flow syntax
         public bool ContainsControlFlow()
         {
-            return Code?.Any(line => line.Trim().StartsWith("``@")) ?? false;
+            return Code?.Any(line => line.Trim().StartsWith("--@")) ?? false;
         }
 
         public bool ContainsDirectFlowReferences()
@@ -58,7 +58,7 @@ namespace MarathonTranspiler.Core
             foreach (var line in Code ?? new List<string>())
             {
                 var trimmed = line.Trim();
-                if (trimmed.StartsWith("``@"))
+                if (trimmed.StartsWith("--@"))
                 {
                     // Extract the flow reference {flowName} from the line
                     var startIndex = trimmed.IndexOf('{');

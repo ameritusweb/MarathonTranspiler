@@ -44,7 +44,7 @@ Configuration options for the C# transpiler, including:
 `CSharpTranspiler.Flow.cs` handles the innovative flow syntax, including:
 
 - Named flow blocks with `@flow(name="flowName")`
-- Control flow syntax with ``@keyword {flowName}``
+- Control flow syntax with `--@keyword {flowName}`
 - Direct flow references with `{flowName}`
 - Advanced loop syntax with transformation and filtering
 
@@ -142,8 +142,8 @@ The transpiler replaces each `{flowName}` reference with the corresponding flow'
 
 ```csharp
 @run(className="DataProcessor", functionName="ProcessData")
-``@if (data.Length > 1000) {HandleLargeData}
-``@else {HandleSmallData}
+--@if (data.Length > 1000) {HandleLargeData}
+--@else {HandleSmallData}
 ```
 
 The transpiler generates appropriate if/else statements with the referenced flow's code.
@@ -153,10 +153,10 @@ The transpiler generates appropriate if/else statements with the referenced flow
 The transpiler supports advanced loop syntax with transformation and filtering:
 
 ```csharp
-``@loop [item:collection] {ProcessItem}               // Basic iteration
-``@loop [i=1:10] {CountUp}                           // Numeric range (inclusive)
-``@loop [t:t.ToUpper():myStrings] {ProcessUppercase}  // Transformation
-``@loop [x:x > 5:numbers] {ProcessLargeNumbers}       // Filtering
+--@loop [item:collection] {ProcessItem}               // Basic iteration
+--@loop [i=1:10] {CountUp}                           // Numeric range (inclusive)
+--@loop [t:t.ToUpper():myStrings] {ProcessUppercase}  // Transformation
+--@loop [x:x > 5:numbers] {ProcessLargeNumbers}       // Filtering
 ```
 
 These are converted to appropriate C# foreach loops, potentially with LINQ Where/Select operations.
@@ -185,7 +185,7 @@ this.count++;
 Console.WriteLine($"Count: {this.count}");
 
 @run(className="Counter", functionName="process")
-``@loop [i=1:5] {CountUp}
+--@loop [i=1:5] {CountUp}
 
 @flow(name="CountUp")
 this.increment();

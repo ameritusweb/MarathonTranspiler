@@ -29,8 +29,8 @@ namespace MarathonTranspiler.Transpilers.CSharp
                     continue;
                 }
 
-                // Check for control flow syntax with loop and expression: ``@loop [expr] {flowName}
-                var loopMatch = Regex.Match(trimmedLine, @"``@loop\s+\[(.*?)\]\s+\{([^}]+)\}");
+                // Check for control flow syntax with loop and expression: --@loop [expr] {flowName}
+                var loopMatch = Regex.Match(trimmedLine, @"--@loop\s+\[(.*?)\]\s+\{([^}]+)\}");
                 if (loopMatch.Success)
                 {
                     var flowName = loopMatch.Groups[2].Value;
@@ -38,8 +38,8 @@ namespace MarathonTranspiler.Transpilers.CSharp
                     continue;
                 }
 
-                // Check for control flow syntax with expression: ``@if (expr) {flowName}
-                var controlFlowWithExprMatch = Regex.Match(trimmedLine, @"``@(\w+)\s+(\([^)]+\))\s+\{([^}]+)\}");
+                // Check for control flow syntax with expression: --@if (expr) {flowName}
+                var controlFlowWithExprMatch = Regex.Match(trimmedLine, @"--@(\w+)\s+(\([^)]+\))\s+\{([^}]+)\}");
                 if (controlFlowWithExprMatch.Success)
                 {
                     var keyword = controlFlowWithExprMatch.Groups[1].Value;
@@ -62,8 +62,8 @@ namespace MarathonTranspiler.Transpilers.CSharp
                     continue;
                 }
 
-                // Check for simple control flow syntax: ``@keyword {flowName}
-                var controlFlowMatch = Regex.Match(trimmedLine, @"``@(\w+)\s+\{([^}]+)\}");
+                // Check for simple control flow syntax: --@keyword {flowName}
+                var controlFlowMatch = Regex.Match(trimmedLine, @"--@(\w+)\s+\{([^}]+)\}");
                 if (controlFlowMatch.Success)
                 {
                     var keyword = controlFlowMatch.Groups[1].Value;
@@ -115,7 +115,7 @@ namespace MarathonTranspiler.Transpilers.CSharp
             var result = new List<string>();
 
             // Extract the loop expression from the line
-            var loopExprMatch = Regex.Match(line.Trim(), @"``@loop\s+\[(.*?)\]");
+            var loopExprMatch = Regex.Match(line.Trim(), @"--@loop\s+\[(.*?)\]");
 
             if (!loopExprMatch.Success || !_flows.ContainsKey(flowName))
             {
@@ -251,7 +251,7 @@ namespace MarathonTranspiler.Transpilers.CSharp
             var result = new List<string>();
 
             // Extract the switch expression
-            var switchMatch = Regex.Match(line.Trim(), @"``@switch\s+(\([^)]+\))\s+\{");
+            var switchMatch = Regex.Match(line.Trim(), @"--@switch\s+(\([^)]+\))\s+\{");
 
             if (switchMatch.Success && _flows.ContainsKey(flowName))
             {
@@ -269,7 +269,7 @@ namespace MarathonTranspiler.Transpilers.CSharp
             var result = new List<string>();
 
             // Extract the case value
-            var caseMatch = Regex.Match(line.Trim(), @"``@case\s+(\S+)\s+\{");
+            var caseMatch = Regex.Match(line.Trim(), @"--@case\s+(\S+)\s+\{");
 
             if (caseMatch.Success && _flows.ContainsKey(flowName))
             {

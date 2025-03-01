@@ -285,7 +285,7 @@ namespace MarathonTranspiler.LSP
             var linePrefix = position.Character > 0 ? line.Substring(0, position.Character) : string.Empty;
 
             // Check if we're in an inline method context
-            if (linePrefix.EndsWith("``@"))
+            if (linePrefix.EndsWith("--@"))
             {
                 // Suggest available classes
                 var completions = _workspace.GetAvailableClasses()
@@ -301,7 +301,7 @@ namespace MarathonTranspiler.LSP
             }
 
             // Check if we're after a dot in an inline method
-            var classNameMatch = System.Text.RegularExpressions.Regex.Match(linePrefix, @"``@(\w+)\.$");
+            var classNameMatch = System.Text.RegularExpressions.Regex.Match(linePrefix, @"--@(\w+)\.$");
             if (classNameMatch.Success)
             {
                 var className = classNameMatch.Groups[1].Value;
