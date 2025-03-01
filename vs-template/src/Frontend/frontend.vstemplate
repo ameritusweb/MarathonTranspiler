@@ -1,0 +1,24 @@
+<VSTemplate Version="3.0.0" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" Type="Project">
+  <TemplateData>
+    <Name>My Frontend Project</Name>  <Description>Description of the frontend project.</Description>
+    <ProjectType>Typescript</ProjectType>
+    <ProjectSubType>Web</ProjectSubType>
+    <SortOrder>10</SortOrder>
+    <CreateNewFolder>true</CreateNewFolder>
+    <CreateInPlace>true</CreateInPlace>
+    <DefaultName>MyFrontend</DefaultName> <ProvideDefaultName>true</ProvideDefaultName>
+    <LocationField>Enabled</LocationField>
+    <EnableLocationBrowseButton>true</EnableLocationBrowseButton>
+    <Icon>__TemplateIcon.ico</Icon> </TemplateData>
+  <TemplateContent>
+    <Project File="reactapp1.client.esproj" ReplaceParameters="true">
+<Folder Name="src" TargetFolderName="src">
+        <ProjectItem ReplaceParameters="true" TargetFileName="JsTest.js">JsTest.js</ProjectItem>
+        <ProjectItem ReplaceParameters="true" TargetFileName="TsTest.ts">TsTest.ts</ProjectItem>
+      </Folder>
+      <ProjectItem ReplaceParameters="true" TargetFileName=".gitignore">.gitignore</ProjectItem>
+      <ProjectItem ReplaceParameters="false" TargetFileName="package.json">package.json</ProjectItem>
+      <ProjectItem ReplaceParameters="false" TargetFileName="tsconfig.json">tsconfig.json</ProjectItem>
+    </Project>
+  </TemplateContent>
+  </VSTemplate>

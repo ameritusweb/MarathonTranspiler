@@ -1,0 +1,24 @@
+<VSTemplate Version="3.0.0" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" Type="Project">
+  <TemplateData>
+    <Name>My Backend Project</Name>  <Description>Description of the backend project.</Description>
+    <ProjectType>CSharp</ProjectType>
+    <ProjectSubType>Web</ProjectSubType>
+    <SortOrder>10</SortOrder>
+    <CreateNewFolder>true</CreateNewFolder>
+    <CreateInPlace>true</CreateInPlace>
+    <DefaultName>MyBackend</DefaultName> <ProvideDefaultName>true</ProvideDefaultName>
+    <LocationField>Enabled</LocationField>
+    <EnableLocationBrowseButton>true</EnableLocationBrowseButton>
+    <Icon>__TemplateIcon.ico</Icon> </TemplateData>
+  <TemplateContent>
+    <Project File="ReactApp1.Server.csproj" ReplaceParameters="true">
+ <Folder Name="Attributes" TargetFolderName="Attributes">
+<ProjectItem ReplaceParameters="true" TargetFileName="AsyncAttribute.cs">AsyncAttribute.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="true" TargetFileName="DependencyAttribute.cs">DependencyAttribute.cs</ProjectItem>
+</Folder>
+<Folder Name="src" TargetFolderName="src">
+      <ProjectItem ReplaceParameters="true" TargetFileName="CsTest.cs">CsTest.cs</ProjectItem>
+</Folder>
+</Project>
+  </TemplateContent>
+  </VSTemplate>

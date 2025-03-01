@@ -1,0 +1,17 @@
+<VSTemplate Version="3.0.0" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" Type="ProjectGroup">
+  <TemplateData>
+    <Name>My Marathon Library</Name> <Description>A template for creating a Marathon library.</Description>
+    <ProjectType>CSharp</ProjectType> <SortOrder>10</SortOrder>
+    <Icon>TemplateIcon.ico</Icon> <CreateNewFolder>true</CreateNewFolder>
+    <DefaultName>MyMarathonApp</DefaultName>
+    <ProvideDefaultName>true</ProvideDefaultName>
+  </TemplateData>
+  <TemplateContent>
+    <ProjectCollection>
+      <ProjectTemplateLink ProjectName="$safeprojectname$.Frontend" CopyParameters="true">
+        Frontend\frontend.vstemplate  </ProjectTemplateLink>
+      <ProjectTemplateLink ProjectName="$safeprojectname$.Backend" CopyParameters="true">
+        Backend\backend.vstemplate  </ProjectTemplateLink>
+    </ProjectCollection>
+  </TemplateContent>
+</VSTemplate>
