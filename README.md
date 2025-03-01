@@ -23,8 +23,10 @@ Marathon lets you write code in the order it executes, then handles the structur
 
 ### Advanced Flow System
 - Named flow blocks with `@flow(name="flowName")`
-- Control flow syntax with ``@keyword {flowName}``
+- Control flow syntax with ``@keyword {flowName}
 - Direct flow references with `{flowName}`
+- Conditional branching with ``@if (condition) {flowName} and ``@else {flowName}
+- Switch/case handling with ``@switch (expression) {SwitchFlowName} and ``@case value {CaseFlowName}
 - Advanced loop syntax with transformation and filtering:
   ```
   ``@loop [item:collection] {ProcessItem}               // Basic iteration
