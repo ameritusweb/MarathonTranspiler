@@ -308,12 +308,17 @@ namespace MarathonTranspiler.LSP
 
                 // Suggest methods for this class
                 var completions = _workspace.GetMethodsForClass(className)
-                    .Select(methodName => new CompletionItem
+                    .Select(methodInfo => new CompletionItem
                     {
-                        Label = methodName,
+                        Label = methodInfo.Name,
                         Kind = CompletionItemKind.Method,
                         InsertTextFormat = InsertTextFormat.Snippet,
-                        InsertText = methodName
+                        InsertText = methodInfo.Name,
+                        Documentation = new MarkupContent
+                        {
+                            Kind = MarkupKind.Markdown,
+                            Value = "```\r\n" + methodInfo.FullText + "\r\n```"
+                        }
                     }).ToList();
 
                 return Task.FromResult(new CompletionList(completions));

@@ -26,7 +26,6 @@ namespace MarathonTranspiler.LSP
         private readonly ConcurrentDictionary<string, List<SemanticTokenData>> _codeBlockCache = new ConcurrentDictionary<string, List<SemanticTokenData>>();
 
         // Cache for language mapping and configuration
-        private static readonly ConcurrentDictionary<string, string> _targetLanguageCache = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, ILanguage> _colorCodeLanguageCache = new ConcurrentDictionary<string, ILanguage>();
 
         // Precomputed token type mappings
@@ -222,7 +221,7 @@ namespace MarathonTranspiler.LSP
             }
 
             // Get target language (with caching)
-            var targetLanguage = GetTargetLanguageFromConfig(uri);
+            var targetLanguage = _workspace.GetTargetLanguageFromConfig(uri);
             var colorCodeLanguage = GetColorCodeLanguage(targetLanguage);
             var originalColorCodeLanguage = colorCodeLanguage;
 
@@ -789,58 +788,6 @@ namespace MarathonTranspiler.LSP
                     // Default to C# if language not supported
                     return ColorCode.Languages.CSharp;
             }
-        }
-
-        private string GetTargetLanguageFromConfig(DocumentUri documentUri)
-        {
-            // Create a cache key from the directory path
-            var filePath = documentUri.GetFileSystemPath();
-            var directory = Path.GetDirectoryName(filePath);
-
-            // Check cache first
-            if (_targetLanguageCache.TryGetValue(directory, out var cachedLanguage))
-            {
-                return cachedLanguage;
-            }
-
-            try
-            {
-                // Look for mrtconfig.json in the same directory
-                var configPath = Path.Combine(directory, "mrtconfig.json");
-
-                if (File.Exists(configPath))
-                {
-                    var configJson = File.ReadAllText(configPath);
-                    var config = Newtonsoft.Json.Linq.JObject.Parse(configJson);
-
-                    // Use JSON path to get the target language
-                    var targetLanguage = config.SelectToken("$.target")?.ToString();
-
-                    if (string.IsNullOrEmpty(targetLanguage))
-                    {
-                        // Try alternative paths if needed
-                        targetLanguage = config.SelectToken("$.transpilerOptions.target")?.ToString() ??
-                                        config.SelectToken("$.settings.language")?.ToString();
-                    }
-
-                    if (!string.IsNullOrEmpty(targetLanguage))
-                    {
-                        // Cache the result
-                        _targetLanguageCache[directory] = targetLanguage;
-                        return targetLanguage;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log the error but continue with default
-                Console.Error.WriteLine($"Error reading mrtconfig.json: {ex.Message}");
-            }
-
-            // Default to C# if config file not found or invalid
-            var defaultLanguage = "csharp";
-            _targetLanguageCache[directory] = defaultLanguage;
-            return defaultLanguage;
         }
 
         // Pre-compute token type mappings

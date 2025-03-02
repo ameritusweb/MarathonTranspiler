@@ -64,10 +64,16 @@ namespace MarathonTranspiler.LSP.Extensions
                                 // Track parameter usages in the body
                                 CollectParameterUsages(functionExpr.Body, parameterUsages);
 
+                                var methodFullText = this.sourceText.Substring(
+                                   methodDef.Start,
+                                   methodDef.End - methodDef.Start
+                               );
+
                                 var method = new MethodInfo
                                 {
                                     Name = methodDef.Key.As<Identifier>().Name,
                                     Body = ExtractBody(methodDef.Value.As<FunctionExpression>().Body),
+                                    FullText = methodFullText,
                                     Parameters = ExtractParameters(methodDef.Value.As<FunctionExpression>()),
                                     ParameterUsages = parameterUsages,
                                     IsStatic = true,

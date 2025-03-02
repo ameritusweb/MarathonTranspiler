@@ -33,10 +33,14 @@ namespace MarathonTranspiler.LSP.Extensions
 
                     var parameterUsages = CollectParameterUsages(method);
 
+                    var methodWithTrivia = method.GetLeadingTrivia().ToString() +
+                                         method.ToString();
+
                     var methodInfo = new MethodInfo
                     {
                         Name = method.Identifier.Text,
                         Body = ExtractBody(method),
+                        FullText = methodWithTrivia,
                         Parameters = ExtractParameters(method),
                         ParameterUsages = parameterUsages,
                         IsStatic = true,

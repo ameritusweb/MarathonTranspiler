@@ -9,10 +9,25 @@ namespace MarathonTranspiler.LSP.Extensions
 {
     public class StaticMethodRegistry
     {
-        private readonly Dictionary<string, Dictionary<string, MethodInfo>> _methodsByClass = new();
+        private readonly Dictionary<string, Dictionary<string, MethodInfo>> _jsMethodsByClass = new();
+        private readonly Dictionary<string, Dictionary<string, MethodInfo>> _csMethodsByClass = new();
         private readonly CSharpParser _csharpParser = new();
         private readonly ScriptParser _jstsParser = new();
         private bool _isInitialized = false;
+        private string? _targetLanguage = null;
+
+        public string TargetLanguage
+        {
+            get
+            {
+                return _targetLanguage ?? string.Empty;
+            }
+        }
+
+        public void SetTargetLanguage(string target)
+        {
+            this._targetLanguage = target;
+        }
 
         public void Initialize(string libraryDirectory)
         {
@@ -22,7 +37,7 @@ namespace MarathonTranspiler.LSP.Extensions
             foreach (var file in Directory.GetFiles(libraryDirectory, "*.cs", SearchOption.AllDirectories))
             {
                 var methods = _csharpParser.ParseFile(file);
-                RegisterMethods(methods);
+                RegisterCsMethods(methods);
             }
 
             // Scan for JS files
@@ -42,49 +57,88 @@ namespace MarathonTranspiler.LSP.Extensions
                 }
 
                 var methods = _jstsParser.ParseFile(file);
-                RegisterMethods(methods);
+                RegisterJsMethods(methods);
             }
 
             _isInitialized = true;
         }
 
-        private void RegisterMethods(List<MethodInfo> methods)
+        private void RegisterJsMethods(List<MethodInfo> methods)
         {
             foreach (var method in methods)
             {
                 string className = method.ClassName;
 
-                if (!_methodsByClass.ContainsKey(className))
+                if (!_jsMethodsByClass.ContainsKey(className))
                 {
-                    _methodsByClass[className] = new Dictionary<string, MethodInfo>();
+                    _jsMethodsByClass[className] = new Dictionary<string, MethodInfo>();
                 }
 
-                _methodsByClass[className][method.Name] = method;
+                _jsMethodsByClass[className][method.Name] = method;
             }
         }
 
-        public bool TryGetMethod(string className, string methodName, out MethodInfo method)
+        private void RegisterCsMethods(List<MethodInfo> methods)
+        {
+            foreach (var method in methods)
+            {
+                string className = method.ClassName;
+
+                if (!_csMethodsByClass.ContainsKey(className))
+                {
+                    _csMethodsByClass[className] = new Dictionary<string, MethodInfo>();
+                }
+
+                _csMethodsByClass[className][method.Name] = method;
+            }
+        }
+
+        public bool TryGetJsMethod(string className, string methodName, out MethodInfo method)
         {
             method = null;
-            if (_methodsByClass.TryGetValue(className, out var classMethods))
+            if (_jsMethodsByClass.TryGetValue(className, out var classMethods))
             {
                 return classMethods.TryGetValue(methodName, out method);
             }
             return false;
         }
 
-        public IEnumerable<string> GetAvailableClasses()
+        public bool TryGetCsMethod(string className, string methodName, out MethodInfo method)
         {
-            return _methodsByClass.Keys;
+            method = null;
+            if (_csMethodsByClass.TryGetValue(className, out var classMethods))
+            {
+                return classMethods.TryGetValue(methodName, out method);
+            }
+            return false;
         }
 
-        public IEnumerable<string> GetMethodsForClass(string className)
+        public IEnumerable<string> GetAvailableJsClasses()
         {
-            if (_methodsByClass.TryGetValue(className, out var methods))
+            return _jsMethodsByClass.Keys;
+        }
+
+        public IEnumerable<string> GetAvailableCsClasses()
+        {
+            return _csMethodsByClass.Keys;
+        }
+
+        public IEnumerable<MethodInfo> GetMethodsForCsClass(string className)
+        {
+            if (_csMethodsByClass.TryGetValue(className, out var methods))
             {
-                return methods.Keys;
+                return methods.Values.OfType<MethodInfo>();
             }
-            return Enumerable.Empty<string>();
+            return Enumerable.Empty<MethodInfo>();
+        }
+
+        public IEnumerable<MethodInfo> GetMethodsForJsClass(string className)
+        {
+            if (_jsMethodsByClass.TryGetValue(className, out var methods))
+            {
+                return methods.Values.OfType<MethodInfo>();
+            }
+            return Enumerable.Empty<MethodInfo>();
         }
     }
 }

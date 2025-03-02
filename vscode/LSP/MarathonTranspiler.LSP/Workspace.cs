@@ -6,6 +6,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using System.Collections.Concurrent;
 using MarathonTranspiler.LSP.Extensions;
+using System.Reflection;
 
 namespace MarathonTranspiler.LSP
 {
@@ -13,6 +14,7 @@ namespace MarathonTranspiler.LSP
     {
         private readonly ConcurrentDictionary<DocumentUri, string> _documents = new();
         private readonly ConcurrentDictionary<DocumentUri, string[]> _documentLines = new();
+        private static readonly ConcurrentDictionary<string, string> _targetLanguageCache = new ConcurrentDictionary<string, string>();
         private ILanguageServer _server;
         private string _rootPath;
         private StaticMethodRegistry? _registry;
@@ -30,6 +32,7 @@ namespace MarathonTranspiler.LSP
                 _registry = new StaticMethodRegistry();
                 var fileInfo = new FileInfo(uri.ToUri().AbsolutePath);
                 _registry.Initialize(Path.Combine(fileInfo.DirectoryName!, "lib"));
+                _registry.SetTargetLanguage(GetTargetLanguageFromConfig(uri));
             }
 
             _documents[uri] = text;
@@ -154,12 +157,78 @@ namespace MarathonTranspiler.LSP
 
         public IEnumerable<string> GetAvailableClasses()
         {
-            return _registry!.GetAvailableClasses();
+            if (_registry?.TargetLanguage == "csharp")
+            {
+                return _registry!.GetAvailableCsClasses();
+            }
+            else
+            {
+                return _registry!.GetAvailableJsClasses();
+            }
         }
 
-        public IEnumerable<string> GetMethodsForClass(string className)
+        public IEnumerable<Model.MethodInfo> GetMethodsForClass(string className)
         {
-            return _registry!.GetMethodsForClass(className);
+            if (_registry?.TargetLanguage == "csharp")
+            {
+                return _registry!.GetMethodsForCsClass(className);
+            }
+            else
+            {
+                return _registry!.GetMethodsForJsClass(className);
+            }
+        }
+
+        public string GetTargetLanguageFromConfig(DocumentUri documentUri)
+        {
+            // Create a cache key from the directory path
+            var filePath = documentUri.GetFileSystemPath();
+            var directory = Path.GetDirectoryName(filePath);
+
+            // Check cache first
+            if (_targetLanguageCache.TryGetValue(directory, out var cachedLanguage))
+            {
+                return cachedLanguage;
+            }
+
+            try
+            {
+                // Look for mrtconfig.json in the same directory
+                var configPath = Path.Combine(directory, "mrtconfig.json");
+
+                if (File.Exists(configPath))
+                {
+                    var configJson = File.ReadAllText(configPath);
+                    var config = Newtonsoft.Json.Linq.JObject.Parse(configJson);
+
+                    // Use JSON path to get the target language
+                    var targetLanguage = config.SelectToken("$.target")?.ToString();
+
+                    if (string.IsNullOrEmpty(targetLanguage))
+                    {
+                        // Try alternative paths if needed
+                        targetLanguage = config.SelectToken("$.transpilerOptions.target")?.ToString() ??
+                                        config.SelectToken("$.settings.language")?.ToString();
+                    }
+
+                    if (!string.IsNullOrEmpty(targetLanguage))
+                    {
+                        // Cache the result
+                        _targetLanguageCache[directory] = targetLanguage;
+                        return targetLanguage;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error but continue with default
+                Console.Error.WriteLine($"Error reading mrtconfig.json: {ex.Message}");
+            }
+
+            // Default to C# if config file not found or invalid
+            var defaultLanguage = "csharp";
+            _targetLanguageCache[directory] = defaultLanguage;
+            return defaultLanguage;
         }
     }
 }

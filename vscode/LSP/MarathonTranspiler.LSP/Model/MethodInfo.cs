@@ -10,6 +10,7 @@ namespace MarathonTranspiler.LSP.Model
     {
         public string Name { get; set; }
         public string Body { get; set; }
+        public string FullText { get; set; }
         public List<string> Parameters { get; set; }
         public List<ParameterUsage> ParameterUsages { get; set; }
         public bool IsStatic { get; set; }
