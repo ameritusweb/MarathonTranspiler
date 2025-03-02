@@ -48,11 +48,40 @@ const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
 const node_1 = require("vscode-languageclient/node");
 let client;
+let statusBarItem;
 function activate(context) {
     return __awaiter(this, void 0, void 0, function* () {
         const serverPath = context.asAbsolutePath(path.join('server', 'MarathonTranspiler.LSP.dll'));
+        statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+        statusBarItem.command = 'marathon.forceCompile';
+        statusBarItem.tooltip = 'Force compile Marathon code';
+        context.subscriptions.push(statusBarItem);
+        // Register force compile command
+        context.subscriptions.push(vscode.commands.registerCommand('marathon.forceCompile', () => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor && editor.document.languageId === 'mrt') {
+                statusBarItem.text = "$(sync~spin) Compiling...";
+                statusBarItem.show();
+                // Send command to LSP
+                client.sendRequest('workspace/executeCommand', {
+                    command: 'marathon.forceCompile',
+                    arguments: [editor.document.uri.toString()]
+                });
+            }
+        }));
         const outputChannel = vscode.window.createOutputChannel('Marathon LSP');
         outputChannel.appendLine(`Extension activated. Working directory: ${serverPath}`);
+        // Show status bar when active editor changes
+        context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
+            outputChannel.appendLine(`Language ID: ${editor && editor.document.languageId}`);
+            if (editor && editor.document.languageId === 'mrt') {
+                statusBarItem.text = "$(check) Ready";
+                statusBarItem.show();
+            }
+            else {
+                statusBarItem.hide();
+            }
+        }));
         // Ensure semantic highlighting is enabled
         yield checkSemanticHighlightingSetting(context, outputChannel);
         // Log available languages

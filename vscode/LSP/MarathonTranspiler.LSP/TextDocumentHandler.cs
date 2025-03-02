@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using MarathonTranspiler.LSP.Model;
+using MediatR;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;

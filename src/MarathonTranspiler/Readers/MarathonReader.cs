@@ -84,14 +84,13 @@ namespace MarathonTranspiler.Readers
             var currentAnnotation = new Annotation();
             var currentCode = new List<string>();
             var currentBlock = new AnnotatedCode();
+            bool annotationFound = false;
 
-            foreach (var line in lines)
+            for (int i = 0; i < lines.Count; ++i)
             {
+                string line = lines[i];
+                var lineNumber = i + 1;
                 var trimmedLine = line.Trim();
-
-                // Skip empty lines
-                if (string.IsNullOrWhiteSpace(trimmedLine))
-                    continue;
 
                 var annotationMatch = AnnotationRegex.Match(trimmedLine);
                 if (annotationMatch.Success)
@@ -106,6 +105,9 @@ namespace MarathonTranspiler.Readers
                         currentBlock = new AnnotatedCode();
                         currentCode.Clear();
                     }
+
+                    annotationFound = true; // We've found at least one annotation
+                    currentBlock.StartLine = lineNumber;
 
                     // Parse the annotation
                     currentAnnotation = new Annotation
@@ -174,8 +176,14 @@ namespace MarathonTranspiler.Readers
                 }
                 else
                 {
-                    // Add code line
-                    currentCode.Add(trimmedLine);
+                    if (annotationFound)
+                    {
+                        currentCode.Add(trimmedLine);
+                        if (currentBlock.StartLine == 0)
+                        {
+                            currentBlock.StartLine = lineNumber;
+                        }
+                    }
                 }
             }
 

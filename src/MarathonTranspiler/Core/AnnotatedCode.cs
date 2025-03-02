@@ -14,6 +14,10 @@ namespace MarathonTranspiler.Core
 
         public Dictionary<string, List<string>> AdditionalData { get; set; } = new();
 
+        public string? TopLevelAnnotationId => Annotations.Count > 0 ? Annotations[0].AnnotationId : null;
+
+        public int StartLine { get; set; }
+
         // Helper method to check if this block contains control flow syntax
         public bool ContainsControlFlow()
         {

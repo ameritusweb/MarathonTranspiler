@@ -11,5 +11,7 @@ namespace MarathonTranspiler.Core
         public string Name { get; set; }
 
         public List<KeyValuePair<string, string>> Values { get; set; } = new List<KeyValuePair<string, string>>();
+
+        public string AnnotationId { get; set; } = Guid.NewGuid().ToString();
     }
 }

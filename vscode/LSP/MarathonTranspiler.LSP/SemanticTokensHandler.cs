@@ -16,6 +16,8 @@ using System.Collections.Immutable;
 using MediatR.Pipeline;
 using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
+using MarathonTranspiler.Readers;
+using MarathonTranspiler.Core;
 
 namespace MarathonTranspiler.LSP
 {
@@ -121,9 +123,14 @@ namespace MarathonTranspiler.LSP
                 {
                     var length = semanticTokens.Data.Length;
                     var cachedLength = cached.tokens.Data.Length;
-                    string[] lines = _workspace.GetDocumentLines(uri);
+                    string[]? lines = _workspace.GetDocumentLines(uri);
 
-                    if (length == cachedLength && lines.Length == _lineCount)
+                    if (lines == null && length == 0)
+                    {
+                        _lineCount = 0;
+                        return GetEmptyDelta();
+                    }
+                    else if (length == cachedLength && lines.Length == _lineCount)
                     {
                         _lineCount = lines.Length;
                         return GetEmptyDelta();
@@ -283,7 +290,7 @@ namespace MarathonTranspiler.LSP
                 // Now handle the code block with language-specific highlighting
                 if (block.Code.Count > 0)
                 {
-                    string codeText = string.Join(Environment.NewLine, block.RawCode);
+                    string codeText = string.Join(Environment.NewLine, block.Code);
                     string blockHash = ComputeHash(codeText);
 
                     if (useCache && _codeBlockCache.TryGetValue(blockHash, out var cachedTokens))
@@ -315,7 +322,7 @@ namespace MarathonTranspiler.LSP
                     }
 
                     // Update line position
-                    currentLineNumber += block.RawCode.Count;
+                    currentLineNumber += block.Code.Count;
                 }
             }
 

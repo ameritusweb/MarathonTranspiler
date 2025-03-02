@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35806.99 d17.13
+VisualStudioVersion = 17.13.35806.99
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarathonTranspiler.LSP", "MarathonTranspiler.LSP.csproj", "{A1CD7422-55DC-487C-848A-4C1B91AE7B5A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarathonTranspiler", "..\..\..\src\MarathonTranspiler\MarathonTranspiler.csproj", "{CEFD9D0B-BC94-9474-EBE7-8DD6810C460D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{A1CD7422-55DC-487C-848A-4C1B91AE7B5A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1CD7422-55DC-487C-848A-4C1B91AE7B5A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1CD7422-55DC-487C-848A-4C1B91AE7B5A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CEFD9D0B-BC94-9474-EBE7-8DD6810C460D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CEFD9D0B-BC94-9474-EBE7-8DD6810C460D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CEFD9D0B-BC94-9474-EBE7-8DD6810C460D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CEFD9D0B-BC94-9474-EBE7-8DD6810C460D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

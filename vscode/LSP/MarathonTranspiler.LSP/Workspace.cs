@@ -7,6 +7,13 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using System.Collections.Concurrent;
 using MarathonTranspiler.LSP.Extensions;
 using System.Reflection;
+using MarathonTranspiler.Model;
+using MarathonTranspiler.Transpilers.CSharp;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using MarathonTranspiler.Core;
+using System.Text.Json;
+using MarathonTranspiler.LSP.Services;
+using MarathonTranspiler.LSP.Model;
 
 namespace MarathonTranspiler.LSP
 {
@@ -14,6 +21,10 @@ namespace MarathonTranspiler.LSP
     {
         private readonly ConcurrentDictionary<DocumentUri, string> _documents = new();
         private readonly ConcurrentDictionary<DocumentUri, string[]> _documentLines = new();
+
+        private readonly ConcurrentDictionary<DocumentUri, CancellationTokenSource> _compilationTokenSources = new();
+        private readonly ConcurrentDictionary<DocumentUri, DateTime> _lastEditTimes = new();
+
         private static readonly ConcurrentDictionary<string, string> _targetLanguageCache = new ConcurrentDictionary<string, string>();
         private ILanguageServer _server;
         private string _rootPath;
@@ -46,6 +57,123 @@ namespace MarathonTranspiler.LSP
 
             _documents[uri] = text;
             _documentLines[uri] = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+            // Update the last edit time
+            _lastEditTimes[uri] = DateTime.UtcNow;
+
+            // Cancel any pending compilation for this document
+            if (_compilationTokenSources.TryGetValue(uri, out var existingTokenSource))
+            {
+                existingTokenSource.Cancel();
+                _compilationTokenSources.TryRemove(uri, out _);
+            }
+
+            // Get config to check for real-time compilation and delay
+            var config = GetConfigForDocument(uri);
+            if (config?.TranspilerOptions?.CSharp?.RealTimeCompilation == true)
+            {
+                // Create new cancellation token source
+                var tokenSource = new CancellationTokenSource();
+                _compilationTokenSources[uri] = tokenSource;
+
+                // Schedule compilation after the configured delay
+                int delayMs = config.TranspilerOptions.CSharp.CompilationDelayMs;
+                Task.Delay(delayMs, tokenSource.Token)
+                    .ContinueWith(t =>
+                    {
+                        if (!t.IsCanceled)
+                        {
+                            TriggerCompilation(uri);
+                        }
+                    }, TaskScheduler.Default);
+            }
+        }
+
+        private void TriggerCompilation(DocumentUri uri)
+        {
+            try
+            {
+                // Remove the token source as we're now executing
+                _compilationTokenSources.TryRemove(uri, out _);
+
+                // Get the document text
+                if (!_documentLines.TryGetValue(uri, out var documentText))
+                    return;
+
+                // Get config
+                var config = GetConfigForDocument(uri);
+                if (config == null)
+                    return;
+
+                // Perform transpilation
+                var registry = new MarathonTranspiler.Extensions.StaticMethodRegistry();
+                registry.Initialize(GetDocumentDirectory(uri));
+
+                var marathonReader = new MarathonTranspiler.Readers.MarathonReader();
+                var annotatedCode = marathonReader.ParseFile(documentText.ToList());
+
+                var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions, registry);
+                TranspilerFactory.ProcessAnnotatedCode(transpiler, annotatedCode, true);
+                var outputCode = transpiler.GenerateOutput();
+
+                // Compile the generated code
+                if (transpiler is CSharpTranspiler csharpTranspiler)
+                {
+                    var compiler = new BackgroundCompilationService(config.TranspilerOptions.CSharp);
+                    var errors = compiler.CompileAsync(outputCode).Result;
+
+                    // Update diagnostics in the editor
+                    UpdateDiagnostics(uri, errors);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't crash
+                Console.Error.WriteLine($"Error during compilation: {ex.Message}");
+            }
+        }
+
+        public void UpdateDiagnostics(DocumentUri uri, List<CompilationError> errors)
+        {
+            var diagnostics = errors.Select(error => new Diagnostic
+            {
+                Message = error.Message,
+                Range = new Range(
+                    new Position(error.MarathonLine - 1, 0),  // Line numbers are 1-based
+                    new Position(error.MarathonLine - 1, int.MaxValue)),
+                Severity = DiagnosticSeverity.Error,
+                Source = "Marathon C# Compiler"
+            }).ToList();
+
+            this.SendDiagnostics(uri, diagnostics);
+        }
+
+        private Config GetConfigForDocument(DocumentUri uri)
+        {
+            try
+            {
+                var filePath = uri.GetFileSystemPath();
+                var directory = Path.GetDirectoryName(filePath);
+                var configPath = Path.Combine(directory, "mrtconfig.json");
+
+                if (File.Exists(configPath))
+                {
+                    string jsonContent = File.ReadAllText(configPath);
+                    return JsonSerializer.Deserialize<Config>(jsonContent);
+                }
+            }
+            catch
+            {
+                // Silently fail and return null
+            }
+
+            return null;
+        }
+
+        private string GetDocumentDirectory(DocumentUri uri)
+        {
+            var filePath = uri.GetFileSystemPath();
+            return Path.GetDirectoryName(filePath);
         }
 
         public void RemoveDocument(DocumentUri uri)
@@ -186,6 +314,19 @@ namespace MarathonTranspiler.LSP
             {
                 return _registry!.GetMethodsForJsClass(className);
             }
+        }
+
+        public void ForceCompilation(DocumentUri uri)
+        {
+            // Cancel any pending compilation
+            if (_compilationTokenSources.TryGetValue(uri, out var tokenSource))
+            {
+                tokenSource.Cancel();
+                _compilationTokenSources.TryRemove(uri, out _);
+            }
+
+            // Trigger immediate compilation
+            TriggerCompilation(uri);
         }
 
         public string GetTargetLanguageFromConfig(DocumentUri documentUri)

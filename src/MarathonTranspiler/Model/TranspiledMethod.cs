@@ -20,5 +20,10 @@ namespace MarathonTranspiler.Model
         public bool IsCoroutine { get; set; }
         public bool IsAutomatic { get; set; }
         public Dictionary<string, int> IndexById { get; set; } = new();
+        public string? SourceAnnotationId { get; set; }
+        public string BlockType { get; set; }
+
+        // For code lines from multiple annotations (like from @more or @flow)
+        public List<(string code, string annotationId)> CodeWithAnnotationIds { get; set; } = new();
     }
 }

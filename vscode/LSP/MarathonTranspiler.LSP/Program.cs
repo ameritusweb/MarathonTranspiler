@@ -27,6 +27,7 @@ namespace MarathonTranspiler.LSP
                        .WithHandler<DefinitionHandler>()
                        .WithHandler<RenameHandler>()
                        .WithHandler<SemanticTokensHandler>()
+                       .WithHandler<CommandHandler>()
                     .OnInitialize(async (server, request, token) =>
                     {
                         workspace.Initialize(server, request.RootPath);
