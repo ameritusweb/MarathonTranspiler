@@ -18,7 +18,7 @@ namespace MarathonTranspiler.Model
 {
     public class TranspilerFactory
     {
-        public static MarathonTranspilerBase CreateTranspiler(TranspilerOptions options, StaticMethodRegistry registry)
+        public static MarathonTranspilerBase CreateTranspiler(TranspilerOptions options, IStaticMethodRegistry registry)
         {
             return options.Target.ToLower() switch
             {

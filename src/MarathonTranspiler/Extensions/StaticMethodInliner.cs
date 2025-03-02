@@ -11,12 +11,14 @@ namespace MarathonTranspiler.Extensions
 {
     public class StaticMethodInliner
     {
-        private readonly StaticMethodRegistry _registry;
+        private readonly IStaticMethodRegistry _registry;
         private readonly HashSet<string> _addedDependencies = new HashSet<string>();
+        private readonly string _language;
 
-        public StaticMethodInliner(StaticMethodRegistry registry)
+        public StaticMethodInliner(IStaticMethodRegistry registry, string language)
         {
             _registry = registry;
+            _language = language;
         }
 
         public string ProcessInlining(string code, out List<string> dependencies)
@@ -27,7 +29,7 @@ namespace MarathonTranspiler.Extensions
 
             foreach (var call in inlineCalls.OrderByDescending(c => c.StartIndex))
             {
-                if (_registry.TryGetMethod(call.ClassName, call.MethodName, out var method))
+                if (_registry.TryGetMethod(_language, call.ClassName, call.MethodName, out var method))
                 {
                     // Add dependencies
                     foreach (var dependency in method.Dependencies)

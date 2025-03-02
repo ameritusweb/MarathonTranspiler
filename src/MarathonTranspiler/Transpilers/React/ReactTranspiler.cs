@@ -19,11 +19,11 @@ namespace MarathonTranspiler.Transpilers.React
         private readonly ReactConfig _config;
         private readonly ReactTestGenerator _testGenerator;
 
-        public ReactTranspiler(ReactConfig config, StaticMethodRegistry registry)
+        public ReactTranspiler(ReactConfig config, IStaticMethodRegistry registry)
         {
             this._config = config;
             this._testGenerator = new ReactTestGenerator(config);
-            this._inliningHelper = new StaticMethodInliningHelper(registry);
+            this._inliningHelper = new StaticMethodInliningHelper(registry, "javascript");
 
             // Add default hooks based on configuration
             if (config.IncludedHooks != null)

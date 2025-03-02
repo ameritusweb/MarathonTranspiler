@@ -11,13 +11,13 @@ namespace MarathonTranspiler.Helpers
 {
     public class StaticMethodInliningHelper
     {
-        private readonly StaticMethodRegistry _methodRegistry;
+        private readonly IStaticMethodRegistry _methodRegistry;
         private readonly StaticMethodInliner _methodInliner;
 
-        public StaticMethodInliningHelper(StaticMethodRegistry registry)
+        public StaticMethodInliningHelper(IStaticMethodRegistry registry, string language)
         {
             _methodRegistry = registry;
-            _methodInliner = new StaticMethodInliner(registry);
+            _methodInliner = new StaticMethodInliner(registry, language);
         }
 
         public void ProcessInlining(AnnotatedCode block)

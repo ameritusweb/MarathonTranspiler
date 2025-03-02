@@ -106,13 +106,10 @@ namespace MarathonTranspiler.LSP
                     return;
 
                 // Perform transpilation
-                var registry = new MarathonTranspiler.Extensions.StaticMethodRegistry();
-                registry.Initialize(GetDocumentDirectory(uri));
-
                 var marathonReader = new MarathonTranspiler.Readers.MarathonReader();
                 var annotatedCode = marathonReader.ParseFile(documentText.ToList());
 
-                var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions, registry);
+                var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions, _registry);
                 TranspilerFactory.ProcessAnnotatedCode(transpiler, annotatedCode, true);
                 var outputCode = transpiler.GenerateOutput();
 
@@ -304,7 +301,7 @@ namespace MarathonTranspiler.LSP
             }
         }
 
-        public IEnumerable<Model.MethodInfo> GetMethodsForClass(string className)
+        public IEnumerable<MarathonTranspiler.Model.MethodInfo> GetMethodsForClass(string className)
         {
             if (_registry?.TargetLanguage == "csharp")
             {

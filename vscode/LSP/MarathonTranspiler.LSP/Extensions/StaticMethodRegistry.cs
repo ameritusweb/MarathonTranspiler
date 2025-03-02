@@ -1,4 +1,6 @@
-﻿using MarathonTranspiler.LSP.Model;
+﻿using MarathonTranspiler.Extensions;
+using MarathonTranspiler.LSP.Model;
+using MarathonTranspiler.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace MarathonTranspiler.LSP.Extensions
 {
-    public class StaticMethodRegistry
+    public class StaticMethodRegistry : IStaticMethodRegistry
     {
         private readonly Dictionary<string, Dictionary<string, MethodInfo>> _jsMethodsByClass = new();
         private readonly Dictionary<string, Dictionary<string, MethodInfo>> _csMethodsByClass = new();
@@ -316,6 +318,34 @@ namespace MarathonTranspiler.LSP.Extensions
                 return classMethods.TryGetValue(methodName, out method);
             }
             return false;
+        }
+
+        public bool TryGetMethod(string language, string className, string methodName, out MethodInfo? method)
+        {
+            if (language == "csharp")
+            {
+                bool res = TryGetCsMethod(className, methodName, out MethodInfo csMethod);
+                if (!res)
+                {
+                    method = null;
+                    return false;
+                }
+
+                method = csMethod;
+            }
+            else
+            {
+                bool res = TryGetJsMethod(className, methodName, out MethodInfo jsMethod);
+                if (!res)
+                {
+                    method = null;
+                    return false;
+                }
+
+                method = jsMethod;
+            }
+
+            return true;
         }
 
         public IEnumerable<string> GetAvailableJsClasses()

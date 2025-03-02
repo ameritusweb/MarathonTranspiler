@@ -22,20 +22,75 @@ namespace MarathonTranspiler.Extensions
             {
                 if (IsStaticMethod(method))
                 {
+                    var className = method.Ancestors()
+                        .OfType<ClassDeclarationSyntax>()
+                        .FirstOrDefault()?.Identifier.Text;
+
+                    var parameterUsages = CollectParameterUsages(method);
+
+                    var methodWithTrivia = method.GetLeadingTrivia().ToString() +
+                                         method.ToString();
+
                     var methodInfo = new MethodInfo
                     {
                         Name = method.Identifier.Text,
                         Body = ExtractBody(method),
+                        FullText = methodWithTrivia,
                         Parameters = ExtractParameters(method),
+                        ParameterUsages = parameterUsages,
                         IsStatic = true,
                         SourceFile = filePath,
-                        Dependencies = ExtractDependencies(method)
+                        Dependencies = ExtractDependencies(method),
+                        ClassName = className!,
+                        BodyStartIndex = method.Body?.SpanStart ?? method.ExpressionBody?.SpanStart ?? 0
                     };
                     methods.Add(methodInfo);
                 }
             }
             return methods;
         }
+
+        private List<ParameterUsage> CollectParameterUsages(MethodDeclarationSyntax method)
+        {
+            var parameterUsages = method.ParameterList.Parameters
+                .Select(p => new ParameterUsage
+                {
+                    Name = p.Identifier.Text,
+                    Locations = new List<int>()
+                })
+                .ToList();
+
+            // For regular method body
+            if (method.Body != null)
+            {
+                CollectIdentifierLocations(method.Body, parameterUsages);
+            }
+            // For expression-bodied members
+            else if (method.ExpressionBody != null)
+            {
+                CollectIdentifierLocations(method.ExpressionBody.Expression, parameterUsages);
+            }
+
+            return parameterUsages;
+        }
+
+        private void CollectIdentifierLocations(SyntaxNode node, List<ParameterUsage> parameterUsages)
+        {
+            if (node is IdentifierNameSyntax identifier)
+            {
+                var usage = parameterUsages.FirstOrDefault(p => p.Name == identifier.Identifier.Text);
+                if (usage != null)
+                {
+                    usage.Locations.Add(identifier.SpanStart);
+                }
+            }
+
+            foreach (var child in node.ChildNodes())
+            {
+                CollectIdentifierLocations(child, parameterUsages);
+            }
+        }
+
         private bool IsStaticMethod(MethodDeclarationSyntax method)
         {
             return method.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword));

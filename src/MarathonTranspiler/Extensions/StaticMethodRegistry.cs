@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace MarathonTranspiler.Extensions
 {
-    public class StaticMethodRegistry
+    public class StaticMethodRegistry : IStaticMethodRegistry
     {
         private readonly Dictionary<string, Dictionary<string, MethodInfo>> _methodsByClass = new();
         private readonly CSharpParser _csharpParser = new();
@@ -56,7 +56,7 @@ namespace MarathonTranspiler.Extensions
             return Path.GetFileNameWithoutExtension(filePath);
         }
 
-        public bool TryGetMethod(string className, string methodName, out MethodInfo method)
+        public bool TryGetMethod(string language, string className, string methodName, out MethodInfo? method)
         {
             method = null;
             if (_methodsByClass.TryGetValue(className, out var classMethods))

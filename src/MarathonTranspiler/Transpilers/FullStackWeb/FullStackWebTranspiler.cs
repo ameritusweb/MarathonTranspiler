@@ -20,7 +20,7 @@ namespace MarathonTranspiler.Transpilers.FullStackWeb
         private readonly ReduxRelationshipHandler _reduxHandler = new();
         private FullStackWebConfig _config;
 
-        public FullStackWebTranspiler(FullStackWebConfig config, StaticMethodRegistry registry)
+        public FullStackWebTranspiler(FullStackWebConfig config, IStaticMethodRegistry registry)
         {
             this._config = config;
             _reactReduxTranspiler = new ReactReduxTranspiler(config.Redux);
