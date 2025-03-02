@@ -23,8 +23,7 @@ namespace MarathonTranspiler.LSP.Services
 
         public async Task<List<CompilationError>> CompileAsync(string generatedCode)
         {
-            if (!_config.RealTimeCompilation)
-                return new List<CompilationError>();
+            _generatedCode = generatedCode;
 
             // Strip line number prefixes for compilation
             var codeForCompilation = StripLineNumberPrefixes(generatedCode);

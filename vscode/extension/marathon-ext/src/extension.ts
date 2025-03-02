@@ -17,17 +17,24 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register force compile command
     context.subscriptions.push(
-        vscode.commands.registerCommand('marathon.forceCompile', () => {
+        vscode.commands.registerCommand('marathon.forceCompile', async () => {
             const editor = vscode.window.activeTextEditor;
             if (editor && editor.document.languageId === 'mrt') {
                 statusBarItem.text = "$(sync~spin) Compiling...";
                 statusBarItem.show();
-                
+
                 // Send command to LSP
-                client.sendRequest('workspace/executeCommand', {
-                    command: 'marathon.forceCompile',
-                    arguments: [editor.document.uri.toString()]
-                });
+                try {
+                    await client.sendRequest('workspace/executeCommand', {
+                        command: 'marathon.forceCompile',
+                        arguments: [editor.document.uri.toString()]
+                    });
+
+                    statusBarItem.text = "$(check) Ready";
+                } catch (error) {
+                    vscode.window.showErrorMessage(`Error during compilation: ${error}`);
+                    statusBarItem.text = "$(error) Compilation Failed";
+                }
             }
         })
     );
@@ -35,16 +42,12 @@ export async function activate(context: vscode.ExtensionContext) {
     const outputChannel = vscode.window.createOutputChannel('Marathon LSP');
     outputChannel.appendLine(`Extension activated. Working directory: ${serverPath}`);
     
+    checkActiveEditor(vscode.window.activeTextEditor);
+
     // Show status bar when active editor changes
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor(editor => {
-            outputChannel.appendLine(`Language ID: ${editor && editor.document.languageId}`);
-            if (editor && editor.document.languageId === 'mrt') {
-                statusBarItem.text = "$(check) Ready";
-                statusBarItem.show();
-            } else {
-                statusBarItem.hide();
-            }
+            checkActiveEditor(editor);
         })
     );
 
@@ -77,6 +80,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
 export function deactivate(): Thenable<void> | undefined {
     return client ? client.stop() : undefined;
+}
+
+function checkActiveEditor(editor: vscode.TextEditor | undefined) {
+    if (editor && editor.document.languageId === 'mrt') {
+        statusBarItem.text = "$(check) Ready";
+        statusBarItem.show();
+    } else {
+        statusBarItem.hide();
+    }
 }
 
 /**
