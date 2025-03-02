@@ -118,6 +118,116 @@ namespace MarathonTranspiler.LSP
             }
         };
 
+        private static readonly List<CompletionItem> ControlFlowSnippets = new()
+        {
+            new CompletionItem
+            {
+                Label = "--@if",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                InsertText = "if (${1:condition}) {${2:FlowName}}",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Conditional if statement with flow reference."
+                }
+            },
+            new CompletionItem
+            {
+                Label = "--@else",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                InsertText = "else {${1:FlowName}}",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Else statement with flow reference."
+                }
+            },
+    
+            // Basic loop iteration
+            new CompletionItem
+            {
+                Label = "--@loop (basic)",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                InsertText = "loop [${1:item}:${2:collection}] {${3:FlowName}}",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Basic loop iteration: [item:collection]"
+                }
+            },
+    
+            // Numeric range loop
+            new CompletionItem
+            {
+                Label = "--@loop (range)",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                InsertText = "loop [${1:i}=${2:1}:${3:10}] {${4:FlowName}}",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Numeric range loop: [i=1:10]"
+                }
+            },
+    
+            // Loop with transformation
+            new CompletionItem
+            {
+                Label = "--@loop (transform)",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                InsertText = "loop [${1:t}:${1:t}.${2:ToUpper()}():${3:collection}] {${4:FlowName}}",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Loop with transformation: [t:t.ToUpper():myStrings]"
+                }
+            },
+    
+            // Loop with filtering
+            new CompletionItem
+            {
+                Label = "--@loop (filter)",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                InsertText = "loop [${1:x}:${1:x} ${2:>} ${3:5}:${4:collection}] {${5:FlowName}}",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Loop with filtering: [x:x > 5:numbers]"
+                }
+            },
+    
+            // Switch and case
+            new CompletionItem
+            {
+                Label = "--@switch",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                InsertText = "switch (${1:expression}) {${2:FlowName}}",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Switch statement with flow reference."
+                }
+            },
+            new CompletionItem
+            {
+                Label = "--@case",
+                Kind = CompletionItemKind.Snippet,
+                InsertTextFormat = InsertTextFormat.Snippet,
+                InsertText = "case ${1:value} {${2:FlowName}}",
+                Documentation = new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "Case statement with flow reference."
+                }
+            }
+        };
+
         // Parameter snippets remain unchanged
         private static readonly Dictionary<string, List<CompletionItem>> ParameterSnippets = new()
         {
@@ -297,6 +407,8 @@ namespace MarathonTranspiler.LSP
                         InsertText = $"{className}.${{1:method}}"
                     }).ToList();
 
+                completions.AddRange(ControlFlowSnippets);
+
                 return Task.FromResult(new CompletionList(completions));
             }
 
@@ -308,17 +420,39 @@ namespace MarathonTranspiler.LSP
 
                 // Suggest methods for this class
                 var completions = _workspace.GetMethodsForClass(className)
-                    .Select(methodInfo => new CompletionItem
-                    {
-                        Label = methodInfo.Name,
-                        Kind = CompletionItemKind.Method,
-                        InsertTextFormat = InsertTextFormat.Snippet,
-                        InsertText = methodInfo.Name,
-                        Documentation = new MarkupContent
+                    .Select(methodInfo => {
+                        // Build parameter placeholders for snippets
+                        string snippetText = methodInfo.Name;
+
+                        // Add parameters as snippet placeholders if there are any parameters
+                        if (methodInfo.Parameters.Count > 0)
                         {
-                            Kind = MarkupKind.Markdown,
-                            Value = "```\r\n" + methodInfo.FullText + "\r\n```"
+                            snippetText += "(";
+                            for (int i = 0; i < methodInfo.Parameters.Count; i++)
+                            {
+                                // Add parameter as a tab stop with the parameter name as default
+                                snippetText += (i > 0 ? ", " : "") + "${" + (i + 1) + ":" + methodInfo.Parameters[i] + "}";
+                            }
+                            snippetText += ")";
                         }
+                        else
+                        {
+                            // No parameters case
+                            snippetText += "()";
+                        }
+
+                        return new CompletionItem
+                        {
+                            Label = methodInfo.Name + "(" + string.Join(", ", methodInfo.Parameters) + ")",
+                            Kind = CompletionItemKind.Snippet,
+                            InsertTextFormat = InsertTextFormat.Snippet,
+                            InsertText = snippetText,
+                            Documentation = new MarkupContent
+                            {
+                                Kind = MarkupKind.Markdown,
+                                Value = "```\r\n" + methodInfo.FullText + "\r\n```"
+                            }
+                        };
                     }).ToList();
 
                 return Task.FromResult(new CompletionList(completions));

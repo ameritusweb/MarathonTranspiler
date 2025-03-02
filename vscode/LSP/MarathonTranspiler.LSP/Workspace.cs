@@ -34,6 +34,15 @@ namespace MarathonTranspiler.LSP
                 _registry.Initialize(Path.Combine(fileInfo.DirectoryName!, "lib"));
                 _registry.SetTargetLanguage(GetTargetLanguageFromConfig(uri));
             }
+            else
+            {
+                // Check if we need to update the target language
+                string targetLanguage = GetTargetLanguageFromConfig(uri);
+                if (_registry.TargetLanguage != targetLanguage)
+                {
+                    _registry.SetTargetLanguage(targetLanguage);
+                }
+            }
 
             _documents[uri] = text;
             _documentLines[uri] = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
