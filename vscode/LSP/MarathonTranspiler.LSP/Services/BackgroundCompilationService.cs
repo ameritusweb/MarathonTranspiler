@@ -85,7 +85,7 @@ namespace MarathonTranspiler.LSP.Services
                 var match = Regex.Match(lines[i], @"^\s*(\d+):(.*)$");
                 if (match.Success)
                 {
-                    lines[i] = match.Groups[1].Value.TrimEnd() + match.Groups[2].Value;
+                    lines[i] = match.Groups[2].Value;
                 }
             }
             return string.Join('\n', lines);
