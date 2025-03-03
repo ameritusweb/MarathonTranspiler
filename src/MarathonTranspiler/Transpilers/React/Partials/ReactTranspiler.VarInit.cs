@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Extensions;
 using MarathonTranspiler.Model;
 using System;
 using System.Collections.Generic;
@@ -13,8 +14,8 @@ namespace MarathonTranspiler.Transpilers.React
         protected override void ProcessVarInit(TranspiledClass currentClass, AnnotatedCode block)
         {
             var annotation = block.Annotations[0];
-            var varName = block.Code[0].Split('=')[0].Replace("this.", "").Trim();
-            var initialValue = block.Code[0].Split('=')[1].Trim();
+            var varName = block.Code[0].NoLineNumber().Split('=')[0].Replace("this.", "").Trim();
+            var initialValue = block.Code[0].NoLineNumber().Split('=')[1].Trim();
 
             if (annotation.Values.Any(v => v.Key == "hookName"))
             {

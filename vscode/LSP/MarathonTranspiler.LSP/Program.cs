@@ -32,6 +32,11 @@ namespace MarathonTranspiler.LSP
                             workspace.Initialize(server, request.RootPath);
                             workspace.SendNotification("Marathon Transpiler LSP is running.");
 
+                            await Task.CompletedTask.ConfigureAwait(false);
+                        })
+                        .OnInitialized(async (server, request, result, token) => {
+
+                            await Task.Delay(100);
                             server.Register(options => options
                                 .OnExecuteCommand<string>("marathon.forceCompile", (arg) => {
                                     DocumentUri uri = DocumentUri.Parse(arg);

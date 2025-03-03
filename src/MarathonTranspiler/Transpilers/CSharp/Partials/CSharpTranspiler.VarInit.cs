@@ -1,4 +1,5 @@
 ﻿using MarathonTranspiler.Core;
+using MarathonTranspiler.Extensions;
 using MarathonTranspiler.Model;
 using System;
 using System.Collections.Generic;
@@ -17,7 +18,7 @@ namespace MarathonTranspiler.Transpilers.CSharp
             var type = annotation.Values.First(v => v.Key == "type").Value;
 
             // Check if it's a local variable declaration (inside a method)
-            var isLocalVar = block.Code.Any(line => line.Trim().StartsWith("var "));
+            var isLocalVar = block.Code.Any(line => line.NoLineNumber().Trim().StartsWith("var "));
 
             if (isLocalVar)
             {
@@ -26,13 +27,13 @@ namespace MarathonTranspiler.Transpilers.CSharp
                 return;
             }
 
-            if (!block.Code[0].StartsWith("this."))
+            if (!block.Code[0].NoLineNumber().StartsWith("this."))
             {
                 currentClass.Fields.Add(block.Code[0]);
             }
             else
             {
-                var propertyName = block.Code[0].Split('=')[0].Replace("this.", "").Trim();
+                var propertyName = block.Code[0].NoLineNumber().Split('=')[0].Replace("this.", "").Trim();
                 currentClass.Properties.Add(new TranspiledProperty { Name = propertyName, Type = type });
                 currentClass.ConstructorLines.Add(block.Code[0]);
             }

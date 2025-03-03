@@ -297,7 +297,7 @@ namespace Marathon.CLI
                         if (verbose)
                         {
                             // If verbose, try to get method info and show parameter info
-                            if (registry.TryGetMethod(className, method, out var methodInfo))
+                            if (registry.TryGetMethod(target, className, method, out var methodInfo))
                             {
                                 Console.WriteLine($"    Parameters: {string.Join(", ", methodInfo.Parameters)}");
                                 foreach (var dependency in methodInfo.Dependencies)
