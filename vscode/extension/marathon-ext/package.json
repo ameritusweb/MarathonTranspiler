@@ -3,7 +3,7 @@
   "publisher": "AmeritusWeb",
   "displayName": "marathon-ext",
   "description": "A runtime-first software development framework",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "icon": "mrt-icon.png",
   "engines": {
     "vscode": "^1.97.0"
@@ -131,6 +131,16 @@
         "language": "mrt",
         "scopeName": "source.mrt",
         "path": "./syntaxes/mrt.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "marathon.forceCompile",
+        "title": "Marathon: Force Compile"
+      },
+      {
+        "command": "marathon.showTranspiled",
+        "title": "Marathon: Show Transpiled Code"
       }
     ]
   },

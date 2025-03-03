@@ -4,6 +4,7 @@ import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } f
 
 let client: LanguageClient;
 let statusBarItem: vscode.StatusBarItem;
+let previewButton: vscode.StatusBarItem;
 
 export async function activate(context: vscode.ExtensionContext) {
     const serverPath = context.asAbsolutePath(
@@ -14,6 +15,12 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBarItem.command = 'marathon.forceCompile';
     statusBarItem.tooltip = 'Force compile Marathon code';
     context.subscriptions.push(statusBarItem);
+
+    previewButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+    previewButton.text = "$(preview) Preview";
+    previewButton.command = 'marathon.showTranspiled';
+    previewButton.tooltip = 'Show transpiled code';
+    context.subscriptions.push(previewButton);
 
     // Register force compile command
     context.subscriptions.push(
@@ -61,6 +68,42 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(outputChannel);
 
+    const showTranspiledCommand = vscode.commands.registerCommand('marathon.showTranspiled', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor && editor.document.languageId === 'mrt') {
+          try {
+            statusBarItem.text = "$(sync~spin) Generating preview...";
+            statusBarItem.show();
+            
+            // Request transpiled code from the LSP
+            const result: any = await client.sendRequest('marathon/getTranspiledCode', {
+              uri: editor.document.uri.toString()
+            });
+            
+            if (result && result.code) {
+              // Create a new untitled document with the transpiled code
+              const languageId = getLanguageIdFromTarget(result.target);
+              const doc = await vscode.workspace.openTextDocument({
+                content: result.code,
+                language: languageId
+              });
+              
+              // Show the document in a new editor group (side by side)
+              await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+              statusBarItem.text = "$(check) Ready";
+            } else {
+              vscode.window.showErrorMessage('No transpiled code available');
+              statusBarItem.text = "$(error) Preview Failed";
+            }
+          } catch (error) {
+            vscode.window.showErrorMessage(`Error generating preview: ${error}`);
+            statusBarItem.text = "$(error) Preview Failed";
+          }
+        }
+      });
+      
+      context.subscriptions.push(showTranspiledCommand);
+
     const serverOptions: ServerOptions = {
         run: { command: "dotnet", args: [serverPath], transport: TransportKind.stdio },
         debug: { command: "dotnet", args: [serverPath], transport: TransportKind.stdio }
@@ -78,18 +121,33 @@ export async function activate(context: vscode.ExtensionContext) {
     client.start();
 }
 
+function getLanguageIdFromTarget(target: string): string {
+    switch (target.toLowerCase()) {
+      case 'csharp': return 'csharp';
+      case 'react': 
+      case 'react-redux': return 'javascript';
+      case 'python': return 'python';
+      case 'unity': return 'csharp';
+      case 'orleans': return 'csharp';
+      case 'wpf': return 'csharp';
+      default: return 'plaintext';
+    }
+  }
+
 export function deactivate(): Thenable<void> | undefined {
     return client ? client.stop() : undefined;
 }
 
 function checkActiveEditor(editor: vscode.TextEditor | undefined) {
     if (editor && editor.document.languageId === 'mrt') {
-        statusBarItem.text = "$(check) Ready";
-        statusBarItem.show();
+      statusBarItem.text = "$(check) Ready";
+      statusBarItem.show();
+      previewButton.show();
     } else {
-        statusBarItem.hide();
+      statusBarItem.hide();
+      previewButton.hide();
     }
-}
+  }
 
 /**
  * Ensures that semantic highlighting is enabled

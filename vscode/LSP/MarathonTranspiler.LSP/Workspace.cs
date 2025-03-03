@@ -14,6 +14,8 @@ using MarathonTranspiler.Core;
 using System.Text.Json;
 using MarathonTranspiler.LSP.Services;
 using MarathonTranspiler.LSP.Model;
+using MarathonTranspiler.Readers;
+using System.Text.RegularExpressions;
 
 namespace MarathonTranspiler.LSP
 {
@@ -218,6 +220,51 @@ namespace MarathonTranspiler.LSP
             foreach (var uri in _documents.Keys)
             {
                 AnalyzeDocument(uri);
+            }
+        }
+
+        public async Task<TranspiledCodeResponse> GetTranspiledCode(MarathonCodeParams parameters, CancellationToken token)
+        {
+            try
+            {
+                var uri = DocumentUri.Parse(parameters.Uri);
+
+                // Get the document lines
+                var lines = GetDocumentLines(uri);
+                if (lines == null)
+                    return new TranspiledCodeResponse { Code = "// No document content available" };
+
+                // Load config to determine target language
+                var config = GetConfigForDocument(uri);
+                if (config == null)
+                    return new TranspiledCodeResponse { Code = "// Unable to load configuration" };
+
+                _registry!.SetTargetLanguage(GetTargetLanguageFromConfig(uri));
+
+                // Process the document
+                var marathonReader = new MarathonReader();
+                var annotatedCode = marathonReader.ParseFile(lines.ToList());
+
+                // Create transpiler and generate code
+                var transpiler = TranspilerFactory.CreateTranspiler(config.TranspilerOptions, _registry);
+                TranspilerFactory.ProcessAnnotatedCode(transpiler, annotatedCode, false);
+                var outputCode = transpiler.GenerateOutput();
+
+                var processedOutputCode = TranspilerFactory.StripLineNumberPrefixes(outputCode);
+
+                return new TranspiledCodeResponse
+                {
+                    Code = processedOutputCode,
+                    Target = config.TranspilerOptions.Target
+                };
+            }
+            catch (Exception ex)
+            {
+                return new TranspiledCodeResponse
+                {
+                    Code = $"// Error generating transpiled code: {ex.Message}",
+                    Target = "plaintext"
+                };
             }
         }
 

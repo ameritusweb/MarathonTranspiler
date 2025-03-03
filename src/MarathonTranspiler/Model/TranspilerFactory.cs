@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace MarathonTranspiler.Model
@@ -52,6 +53,20 @@ namespace MarathonTranspiler.Model
 
             // Process the code
             transpiler.ProcessAnnotatedCode(annotatedCodes);
+        }
+
+        public static string StripLineNumberPrefixes(string code)
+        {
+            var lines = code.Split('\n');
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var match = Regex.Match(lines[i], @"^(\s*)(\d+):(.*)$");
+                if (match.Success)
+                {
+                    lines[i] = match.Groups[1].Value + match.Groups[3].Value;
+                }
+            }
+            return string.Join('\n', lines);
         }
     }
 }

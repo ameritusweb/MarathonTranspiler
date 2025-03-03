@@ -72,7 +72,8 @@ Marathon lets you write code in the order it executes, then handles the structur
 dotnet tool install --global Marathon.CLI
 
 # Install the VS Code extension
-code --install-extension marathon-transpiler.vsix
+cd vscode\extension\marathon-ext
+code --install-extension marathon-ext-0.0.4.vsix
 ```
 
 ### Basic Usage

@@ -1,4 +1,5 @@
 ﻿using ColorCode.Compilation.Languages;
+using MarathonTranspiler.LSP.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -42,6 +43,12 @@ namespace MarathonTranspiler.LSP
                                     DocumentUri uri = DocumentUri.Parse(arg);
                                     workspace.ForceCompilation(uri);
                                     return Task.FromResult(MediatR.Unit.Value);
+                                })
+                            );
+
+                            server.Register(options => options
+                                .OnRequest<MarathonCodeParams, TranspiledCodeResponse>("marathon/getTranspiledCode", async (parameters, token) => {
+                                    return await workspace.GetTranspiledCode(parameters, token);
                                 })
                             );
 

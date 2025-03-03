@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using MarathonTranspiler.Model;
 
 namespace MarathonTranspiler.LSP.Services
 {
@@ -26,7 +27,7 @@ namespace MarathonTranspiler.LSP.Services
             _generatedCode = generatedCode;
 
             // Strip line number prefixes for compilation
-            var codeForCompilation = StripLineNumberPrefixes(generatedCode);
+            var codeForCompilation = TranspilerFactory.StripLineNumberPrefixes(generatedCode);
 
             var syntaxTree = CSharpSyntaxTree.ParseText(codeForCompilation);
             var compilation = CSharpCompilation.Create("MarathonCompilation")
@@ -76,19 +77,5 @@ namespace MarathonTranspiler.LSP.Services
 
         // Store the generated code for error mapping
         private string _generatedCode;
-
-        private string StripLineNumberPrefixes(string code)
-        {
-            var lines = code.Split('\n');
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var match = Regex.Match(lines[i], @"^\s*(\d+):(.*)$");
-                if (match.Success)
-                {
-                    lines[i] = match.Groups[2].Value;
-                }
-            }
-            return string.Join('\n', lines);
-        }
     }
 }
