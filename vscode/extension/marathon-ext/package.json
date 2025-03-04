@@ -3,7 +3,7 @@
   "publisher": "AmeritusWeb",
   "displayName": "marathon-ext",
   "description": "A runtime-first software development framework",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "icon": "mrt-icon.png",
   "engines": {
     "vscode": "^1.97.0"

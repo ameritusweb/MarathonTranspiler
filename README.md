@@ -73,7 +73,7 @@ dotnet tool install --global Marathon.CLI
 
 # Install the VS Code extension
 cd vscode\extension\marathon-ext
-code --install-extension marathon-ext-0.0.4.vsix
+code --install-extension marathon-ext-0.0.5.vsix
 ```
 
 ### Basic Usage
